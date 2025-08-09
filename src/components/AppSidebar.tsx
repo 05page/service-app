@@ -15,22 +15,48 @@ import { Button } from "@/components/ui/button";
 interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
+  userRole: "admin" | "employee" | "client";
 }
 
-const menuItems = [
-  { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { id: "clients", label: "Clients", icon: Users },
-  { id: "intermediaires", label: "Intermédiaires", icon: UserCheck },
-  { id: "personnel", label: "Personnel", icon: Building2 },
-  { id: "fournisseurs", label: "Fournisseurs", icon: Package },
-  { id: "ventes", label: "Ventes", icon: ShoppingCart },
-  { id: "achats", label: "Achats", icon: TrendingUp },
-  { id: "stock", label: "Stock", icon: Package },
-  { id: "commissions", label: "Commissions", icon: Wallet },
-  { id: "settings", label: "Paramètres", icon: Settings },
-];
 
-export function AppSidebar({ activeSection, onSectionChange }: SidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, userRole }: SidebarProps) {
+  const getMenuItems = () => {
+    const baseItems = [
+      { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+    ];
+
+    if (userRole === "admin") {
+      return [
+        ...baseItems,
+        { id: "clients", label: "Clients", icon: Users },
+        { id: "intermediaires", label: "Intermédiaires", icon: UserCheck },
+        { id: "ventes", label: "Ventes", icon: ShoppingCart },
+        { id: "personnel", label: "Personnel", icon: Building2 },
+        { id: "fournisseurs", label: "Fournisseurs", icon: Package },
+        { id: "achats", label: "Achats", icon: TrendingUp },
+        { id: "stock", label: "Stock", icon: Package },
+        { id: "commissions", label: "Commissions", icon: Wallet },
+        { id: "settings", label: "Paramètres", icon: Settings },
+      ];
+    }
+
+    if (userRole === "employee") {
+      return [
+        ...baseItems,
+        { id: "clients", label: "Clients", icon: Users },
+        { id: "ventes", label: "Ventes", icon: ShoppingCart },
+        { id: "settings", label: "Paramètres", icon: Settings },
+      ];
+    }
+
+    // Client role - only dashboard and settings
+    return [
+      ...baseItems,
+      { id: "settings", label: "Paramètres", icon: Settings },
+    ];
+  };
+
+  const currentMenuItems = getMenuItems();
   return (
     <div className="w-64 bg-sidebar border-r border-sidebar-border h-screen flex flex-col">
       <div className="p-6 border-b border-sidebar-border">
@@ -43,7 +69,7 @@ export function AppSidebar({ activeSection, onSectionChange }: SidebarProps) {
       </div>
       
       <nav className="flex-1 p-4 space-y-2">
-        {menuItems.map((item) => {
+        {currentMenuItems.map((item) => {
           const Icon = item.icon;
           return (
             <Button
