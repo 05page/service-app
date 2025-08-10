@@ -8,6 +8,10 @@ import { DashboardClient } from "@/components/DashboardClient";
 import { ClientsSection } from "@/components/ClientsSection";
 import { IntermediairesSection } from "@/components/IntermediairesSection";
 import { VentesSection } from "@/components/VentesSection";
+import { FournisseursSection } from "@/components/FournisseursSection";
+import { PersonnelSection } from "@/components/PersonnelSection";
+import { AchatsSection } from "@/components/AchatsSection";
+import { StockSection } from "@/components/StockSection";
 import { UserRole } from "./Auth";
 
 const Index = () => {
@@ -53,21 +57,13 @@ const Index = () => {
       case "ventes":
         return userRole === "admin" || userRole === "employee" ? <VentesSection /> : renderDashboard();
       case "personnel":
-        return userRole === "admin" ? (
-          <div className="p-8"><h1 className="text-2xl font-bold">Personnel - En cours de développement</h1></div>
-        ) : renderDashboard();
+        return userRole === "admin" ? <PersonnelSection /> : renderDashboard();
       case "fournisseurs":
-        return userRole === "admin" ? (
-          <div className="p-8"><h1 className="text-2xl font-bold">Fournisseurs - En cours de développement</h1></div>
-        ) : renderDashboard();
+        return userRole === "admin" ? <FournisseursSection /> : renderDashboard();
       case "achats":
-        return userRole === "admin" ? (
-          <div className="p-8"><h1 className="text-2xl font-bold">Achats - En cours de développement</h1></div>
-        ) : renderDashboard();
+        return userRole === "admin" ? <AchatsSection /> : renderDashboard();
       case "stock":
-        return userRole === "admin" ? (
-          <div className="p-8"><h1 className="text-2xl font-bold">Stock - En cours de développement</h1></div>
-        ) : renderDashboard();
+        return userRole === "admin" ? <StockSection /> : renderDashboard();
       case "commissions":
         return userRole === "admin" ? (
           <div className="p-8"><h1 className="text-2xl font-bold">Commissions - En cours de développement</h1></div>
