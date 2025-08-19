@@ -12,6 +12,8 @@ import { FournisseursSection } from "@/components/FournisseursSection";
 import { PersonnelSection } from "@/components/PersonnelSection";
 import { AchatsSection } from "@/components/AchatsSection";
 import { StockSection } from "@/components/StockSection";
+import { CommissionsSection } from "@/components/CommissionsSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import { UserRole } from "./Auth";
 
 const Index = () => {
@@ -65,11 +67,9 @@ const Index = () => {
       case "stock":
         return userRole === "admin" ? <StockSection /> : renderDashboard();
       case "commissions":
-        return userRole === "admin" ? (
-          <div className="p-8"><h1 className="text-2xl font-bold">Commissions - En cours de développement</h1></div>
-        ) : renderDashboard();
+        return userRole === "admin" ? <CommissionsSection /> : renderDashboard();
       case "settings":
-        return <div className="p-8"><h1 className="text-2xl font-bold">Paramètres - En cours de développement</h1></div>;
+        return <SettingsSection />;
       default:
         return renderDashboard();
     }
