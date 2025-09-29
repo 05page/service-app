@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from '../api/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin, RefreshCw, PowerOff, Power, Building } from "lucide-react";
+import { toast } from "sonner";
 
 interface Fournisseur {
   id: string;
@@ -27,56 +28,206 @@ export function FournisseursSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
 
-  const fournisseurs: Fournisseur[] = [
-    {
-      id: "1",
-      nom: "TechServices Pro",
-      email: "contact@techservices.com",
-      telephone: "+33 1 23 45 67 89",
-      adresse: "15 rue de la Tech, 75001 Paris",
-      statut: "actif",
-      typeServices: "Services Informatiques",
-      dateCreation: "2024-01-15",
-      totalCommandes: 25,
-      montantTotal: 45000
-    },
-    {
-      id: "2",
-      nom: "Marketing Solutions",
-      email: "info@marketingsol.com",
-      telephone: "+33 1 98 76 54 32",
-      adresse: "8 avenue Marketing, 69000 Lyon",
-      statut: "actif",
-      typeServices: "Marketing Digital",
-      dateCreation: "2024-02-10",
-      totalCommandes: 18,
-      montantTotal: 32000
-    },
-    {
-      id: "3",
-      nom: "Design Studio",
-      email: "hello@designstudio.com",
-      telephone: "+33 4 56 78 90 12",
-      adresse: "22 boulevard Design, 13000 Marseille",
-      statut: "inactif",
-      typeServices: "Design Graphique",
-      dateCreation: "2023-11-20",
-      totalCommandes: 12,
-      montantTotal: 18000
-    }
-  ];
+  // États
+  const [refreshing, setRefreshing] = useState(false);
+  const [fournisseur, setFournisseurs] = useState([]);
+  const [selectStats, setSelectStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedFournisseur, setSelectedFournisseur] = useState<any>(null);
 
-  const filteredFournisseurs = fournisseurs.filter(fournisseur => {
-    const matchesSearch = fournisseur.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         fournisseur.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         fournisseur.typeServices.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatut = selectedStatut === "tous" || fournisseur.statut === selectedStatut;
+  // Formulaire
+  const [nomFournisseurs, setNomFournisseurs] = useState("");
+  const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [adresse, setAdresse] = useState("");
+  const [description, setDescription] = useState("");
+
+  const getFournisseur = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token non trouvé');
+        return;
+      }
+
+      const response = await api.get('/fournisseurs/stats/');
+      setSelectStats(response.data.data);
+
+      const responses = await api.get('/fournisseurs/');
+      setFournisseurs(responses.data.data || []);
+    } catch (error: any) {
+      console.error('Erreur de récupération', error);
+      if (error.response?.status === 401) {
+        toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
+        window.location.href = '/auth';
+      } else if (error.response?.status === 403) {
+        toast.error('Accès refusé');
+      } else {
+        toast.error('Erreur lors du chargement des données');
+      }
+      setFournisseurs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await getFournisseur();
+      toast.success("Données actualisées");
+    } catch (error) {
+      toast.error('Erreur lors de l\'actualisation');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nomFournisseurs || !email || !adresse || !description) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    try {
+      const response = await api.post('/fournisseurs/', {
+        nom_fournisseurs: nomFournisseurs,
+        email,
+        telephone,
+        adresse,
+        description,
+      });
+
+      toast.success(response.data.message);
+      resetForm();
+      setDialogOpen(false);
+      getFournisseur();
+    } catch (error: any) {
+      console.error(error.response?.data);
+      const message = error.response?.data?.message || "Erreur survenue lors de l'ajout du fournisseur";
+      toast.error(message);
+    }
+  };
+
+  const handleEdit = (fournisseurItem: any) => {
+    setSelectedFournisseur(fournisseurItem);
+    setNomFournisseurs(fournisseurItem.nom_fournisseurs || "");
+    setEmail(fournisseurItem.email || "");
+    setTelephone(fournisseurItem.telephone || "");
+    setAdresse(fournisseurItem.adresse || "");
+    setDescription(fournisseurItem.description || "");
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedFournisseur) return;
+    
+    if (!nomFournisseurs || !email || !adresse || !description) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    try {
+      const response = await api.put(`/fournisseurs/${selectedFournisseur.id}`, {
+        nom_fournisseurs: nomFournisseurs,
+        email,
+        telephone,
+        adresse,
+        description
+      });
+
+      toast.success(response.data.message || 'Fournisseur mis à jour avec succès');
+      resetForm();
+      setSelectedFournisseur(null);
+      setEditDialogOpen(false);
+      getFournisseur();
+      
+    } catch (error: any) {
+      console.error('Erreur mise à jour fournisseur:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de la mise à jour du fournisseur";
+      toast.error(message);
+    }
+  };
+
+  const handleDelete = async (fournisseurId: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce fournisseur ?')) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/fournisseurs/${fournisseurId}`);
+      toast.success(response.data.message || 'Fournisseur supprimé avec succès');
+      getFournisseur();
+    } catch (error: any) {
+      console.error('Erreur suppression fournisseur:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de la suppression du fournisseur";
+      toast.error(message);
+    }
+  };
+
+  const handleToggleStatus = async (fournisseurId: string, action: "desactive" | "reactive") => {
+    const confirmMessage = action === "desactive"
+      ? "Voulez-vous vraiment désactiver ce fournisseur ?"
+      : "Voulez-vous vraiment réactiver ce fournisseur ?";
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    
+    try {
+      const response = await api.post(`/fournisseurs/${action}/${fournisseurId}`);
+      toast.success(response.data.message);
+      getFournisseur();
+    } catch (error: any) {
+      console.error('Erreur:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Erreur lors du changement de statut');
+    }
+  };
+
+  const resetForm = () => {
+    setNomFournisseurs("");
+    setEmail("");
+    setTelephone("");
+    setAdresse("");
+    setDescription("");
+  };
+
+  useEffect(() => {
+    getFournisseur();
+  }, []);
+
+  // Filtrage des fournisseurs
+  const filteredFournisseurs = fournisseur.filter((f: any) => {
+    const matchesSearch = f.nom_fournisseurs?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.telephone?.includes(searchTerm);
+    
+    // Correction du filtrage par statut pour correspondre aux valeurs booléennes du serveur
+    const matchesStatut = selectedStatut === "tous" || 
+      (selectedStatut === "actif" && f.actif === true) ||
+      (selectedStatut === "inactif" && f.actif === false);
+    
     return matchesSearch && matchesStatut;
   });
 
-  const totalFournisseurs = fournisseurs.length;
-  const fournisseursActifs = fournisseurs.filter(f => f.statut === "actif").length;
-  const montantTotalAchats = fournisseurs.reduce((sum, f) => sum + f.montantTotal, 0);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Chargement de la liste de fournisseur...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,45 +236,175 @@ export function FournisseursSection() {
           <h1 className="text-3xl font-bold tracking-tight">Fournisseurs</h1>
           <p className="text-muted-foreground">Gérez vos fournisseurs de services</p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau Fournisseur
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Ajouter un nouveau fournisseur</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="nom">Nom de l'entreprise</Label>
-                <Input id="nom" placeholder="Nom du fournisseur" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="contact@fournisseur.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telephone">Téléphone</Label>
-                <Input id="telephone" placeholder="+33 1 23 45 67 89" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="typeServices">Type de services</Label>
-                <Input id="typeServices" placeholder="Ex: Services Informatiques" />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="adresse">Adresse</Label>
-                <Textarea id="adresse" placeholder="Adresse complète" />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline">Annuler</Button>
-              <Button>Ajouter</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau Fournisseur
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Ajouter un nouveau fournisseur</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nom">Nom de l'entreprise *</Label>
+                    <Input 
+                      id="nom"
+                      value={nomFournisseurs}
+                      onChange={(e) => setNomFournisseurs(e.target.value)}
+                      placeholder="Nom du fournisseur"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input 
+                      id="email" 
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="contact@fournisseur.com"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telephone">Téléphone</Label>
+                    <Input 
+                      id="telephone"
+                      value={telephone}
+                      onChange={(e) => setTelephone(e.target.value)}
+                      placeholder="+225 01 02 03 04 05"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="adresse">Adresse *</Label>
+                    <Input 
+                      id="adresse"
+                      value={adresse}
+                      onChange={(e) => setAdresse(e.target.value)}
+                      placeholder="Ex: Yopougon"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="description">Type de service *</Label>
+                    <Input 
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Ex: Services Informatiques"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      resetForm();
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit">Ajouter</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog d'édition */}
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Modifier le fournisseur</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleUpdate}>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-nom">Nom de l'entreprise *</Label>
+                    <Input 
+                      id="edit-nom"
+                      value={nomFournisseurs}
+                      onChange={(e) => setNomFournisseurs(e.target.value)}
+                      placeholder="Nom du fournisseur"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-email">Email *</Label>
+                    <Input 
+                      id="edit-email" 
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="contact@fournisseur.com"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-telephone">Téléphone</Label>
+                    <Input 
+                      id="edit-telephone"
+                      value={telephone}
+                      onChange={(e) => setTelephone(e.target.value)}
+                      placeholder="+225 01 02 03 04 05"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-adresse">Adresse *</Label>
+                    <Input 
+                      id="edit-adresse"
+                      value={adresse}
+                      onChange={(e) => setAdresse(e.target.value)}
+                      placeholder="Ex: Yopougon"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="edit-description">Type de service *</Label>
+                    <Input 
+                      id="edit-description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Ex: Services Informatiques"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => {
+                      setEditDialogOpen(false);
+                      setSelectedFournisseur(null);
+                      resetForm();
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit">Mettre à jour</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Statistiques */}
@@ -131,9 +412,10 @@ export function FournisseursSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Fournisseurs</CardTitle>
+            <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalFournisseurs}</div>
+            <div className="text-2xl font-bold">{selectStats?.total_fournisseurs || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -141,15 +423,7 @@ export function FournisseursSection() {
             <CardTitle className="text-sm font-medium">Fournisseurs Actifs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{fournisseursActifs}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Achats</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{montantTotalAchats.toLocaleString()} €</div>
+            <div className="text-2xl font-bold text-green-600">{selectStats?.total_fournisseurs_actifs || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -157,7 +431,7 @@ export function FournisseursSection() {
             <CardTitle className="text-sm font-medium">Commandes ce mois</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{selectStats?.total_commande || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -200,55 +474,112 @@ export function FournisseursSection() {
                 <TableHead>Contact</TableHead>
                 <TableHead>Type de services</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead>Commandes</TableHead>
-                <TableHead>Montant total</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredFournisseurs.map((fournisseur) => (
-                <TableRow key={fournisseur.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{fournisseur.nom}</div>
-                      <div className="text-sm text-muted-foreground flex items-center mt-1">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {fournisseur.adresse}
+              {filteredFournisseurs && filteredFournisseurs.length > 0 ? (
+                filteredFournisseurs.map((f: any) => (
+                  <TableRow key={f.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{f.nom_fournisseurs}</div>
+                        <div className="text-sm text-muted-foreground flex items-center mt-1">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {f.adresse}
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center text-sm">
-                        <Mail className="h-3 w-3 mr-1" />
-                        {fournisseur.email}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-3 w-3 mr-1" />
+                          {f.email}
+                        </div>
+                        {f.telephone && (
+                          <div className="flex items-center text-sm">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {f.telephone}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center text-sm">
-                        <Phone className="h-3 w-3 mr-1" />
-                        {fournisseur.telephone}
+                    </TableCell>
+                    <TableCell>{f.description}</TableCell>
+                    <TableCell>
+                      <Badge variant={f.actif ? "default" : "secondary"}>
+                        {f.actif ? "Actif" : "Inactif"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEdit(f)}
+                          title="Modifier"
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDelete(f.id)}
+                          title="Supprimer"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                        {f.actif ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleStatus(f.id, "desactive")}
+                            title="Désactiver"
+                            className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
+                          >
+                            <PowerOff className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleStatus(f.id, "reactive")}
+                            title="Réactiver"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
+                          >
+                            <Power className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{fournisseur.typeServices}</TableCell>
-                  <TableCell>
-                    <Badge variant={fournisseur.statut === "actif" ? "default" : "secondary"}>
-                      {fournisseur.statut}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{fournisseur.totalCommandes}</TableCell>
-                  <TableCell>{fournisseur.montantTotal.toLocaleString()} €</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-12">
+                    <Building className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
+                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                      {searchTerm || selectedStatut !== "tous" 
+                        ? 'Aucun fournisseur trouvé' 
+                        : 'Aucun fournisseur disponible'
+                      }
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center mb-6">
+                      {searchTerm || selectedStatut !== "tous"
+                        ? `Aucun fournisseur ne correspond à vos critères de recherche`
+                        : 'Vous n\'avez pas encore de fournisseur. Ajoutez votre premier fournisseur pour commencer.'
+                      }
+                    </p>
+                    {!searchTerm && selectedStatut === "tous" && (
+                      <Button onClick={() => setDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Ajouter mon premier fournisseur
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    )}
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>

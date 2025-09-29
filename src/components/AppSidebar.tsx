@@ -2,12 +2,14 @@ import {
   LayoutDashboard, 
   Users, 
   UserCheck, 
+  Shield,
   Building2, 
   ShoppingCart, 
   Package, 
   TrendingUp,
   Wallet,
-  Settings
+  Settings,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,7 +17,7 @@ import { Button } from "@/components/ui/button";
 interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
-  userRole: "admin" | "employee" | "client";
+  userRole: "admin" | "employe" | "client";
 }
 
 
@@ -29,18 +31,20 @@ export function AppSidebar({ activeSection, onSectionChange, userRole }: Sidebar
       return [
         ...baseItems,
         { id: "clients", label: "Clients", icon: Users },
-        { id: "intermediaires", label: "Intermédiaires", icon: UserCheck },
+        // { id: "intermediaires", label: "Intermédiaires", icon: UserCheck },
         { id: "ventes", label: "Ventes", icon: ShoppingCart },
         { id: "personnel", label: "Personnel", icon: Building2 },
+        { id: "permissions", label: "Permissions", icon: Shield },
         { id: "fournisseurs", label: "Fournisseurs", icon: Package },
         { id: "achats", label: "Achats", icon: TrendingUp },
         { id: "stock", label: "Stock", icon: Package },
-        { id: "commissions", label: "Commissions", icon: Wallet },
-        { id: "settings", label: "Paramètres", icon: Settings },
+        { id: "profile", label: "Mon Profil", icon: User },
+        // { id: "commissions", label: "Commissions", icon: Wallet },
+        // { id: "settings", label: "Paramètres", icon: Settings },
       ];
     }
 
-    if (userRole === "employee") {
+    if (userRole === "employe") {
       return [
         ...baseItems,
         { id: "clients", label: "Clients", icon: Users },

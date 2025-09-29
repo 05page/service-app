@@ -34,16 +34,14 @@ export function VentesSection() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-
+  
   // États pour le formulaire
   const [stock, setStock] = useState([]);
+  const [clients, setClients] = useState([]);
   const [stockId, setStockId] = useState("");
-  const [client, setClient] = useState("");
-  const [numero, setNumero] = useState("");
-  const [adresse, setAdresse] = useState("")
+  const [clientId, setClientId] = useState("");
   const [quantite, setQuantite] = useState("");
   const [prixUnitaire, setPrixUnitaire] = useState("");
-  const [prixTotal, setPrixTotal] = useState("");
 
   const fetchVentesStats = async () => {
     try {
@@ -75,7 +73,6 @@ export function VentesSection() {
     try {
       const response = await api.get('/ventes/');
       setSelectVentes(response.data.data || [])
-      console.log(response.data.data)
     } catch (error: any) {
       console.error('Erreur survenue lors de la récupération des ventes', error);
       if (error.response?.status === 403) {
@@ -94,7 +91,10 @@ export function VentesSection() {
       // Récupérer les stocks disponibles
       const stockResponse = await api.get('/stock/');
       setStock(stockResponse.data.data || []);
-
+      
+      // Récupérer les clients
+      const clientsResponse = await api.get('/clients/');
+      setClients(clientsResponse.data.data || []);
     } catch (error: any) {
       console.error('Erreur lors du chargement des données du formulaire', error);
       toast.error('Erreur lors du chargement des données');
@@ -106,12 +106,6 @@ export function VentesSection() {
     selectVente()
     fetchFormData()
   }, [])
-
-  useEffect(() => {
-    const q = parseInt(quantite) || 0;
-    const pU = parseFloat(prixUnitaire) || 0
-    setPrixTotal((q * pU).toFixed(2))
-  }, [quantite, prixUnitaire])
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -128,10 +122,54 @@ export function VentesSection() {
     }
   }
 
+  const handleDownloadFacture = async (venteId: string) => {
+    try {
+      toast.info('Génération de la facture en cours...');
+      
+      const response = await api.get(`/vente/${venteId}/pdf`, {
+        responseType: 'blob' // Important pour récupérer le PDF
+      });
+
+      // Créer un blob URL pour le téléchargement
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Créer un lien temporaire et déclencher le téléchargement
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `facture-${venteId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Nettoyer
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Facture téléchargée avec succès');
+      
+    } catch (error: any) {
+      console.error('Erreur téléchargement facture:', error.response?.data);
+      
+      // Si l'erreur est un JSON (pas un PDF), la lire
+      if (error.response?.data instanceof Blob) {
+        const text = await error.response.data.text();
+        try {
+          const errorData = JSON.parse(text);
+          toast.error(errorData.message || 'Erreur lors de la génération de la facture');
+        } catch {
+          toast.error('Erreur lors de la génération de la facture');
+        }
+      } else {
+        const message = error.response?.data?.message || 'Erreur lors du téléchargement de la facture';
+        toast.error(message);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!stockId || !client || !numero || !adresse || !quantite || !prixUnitaire) {
+    
+    if (!stockId || !clientId || !quantite || !prixUnitaire) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
@@ -139,28 +177,24 @@ export function VentesSection() {
     try {
       const response = await api.post('/ventes/', {
         stock_id: parseInt(stockId),
-        nom_client: client,
-        numero,
-        adresse,
+        client_id: parseInt(clientId),
         quantite: parseInt(quantite),
+        prix_unitaire: parseFloat(prixUnitaire)
       });
 
       toast.success(response.data.message || 'Vente créée avec succès');
-
+      
       // Réinitialiser le formulaire
       setStockId("");
-      setClient("");
-      setNumero("");
-      setAdresse("");
+      setClientId("");
       setQuantite("");
       setPrixUnitaire("");
-      setPrixTotal("");
-
+      
       // Fermer le dialog et recharger les données
       setDialogOpen(false);
       fetchVentesStats();
       selectVente();
-
+      
     } catch (error: any) {
       console.error('Erreur création vente:', error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de la création de la vente";
@@ -177,46 +211,6 @@ export function VentesSection() {
       }
     }
   }, [stockId, stock]);
-
-  //Factures
-  const handleDownloadFacture = async (venteId: string) => {
-    try {
-      toast.info('Génération de facture en cours...');
-
-      const response = await api.get(`factures/vente/${venteId}/pdf`, {
-        responseType: 'blob'
-      });
-
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `facture-${venteId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-
-      // Nettoyer
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('Facture téléchargée avec succès');
-    } catch (error: any) {
-      if (error.response?.data instanceof Blob) {
-        const text = await error.response.data.text();
-        console.error("Réponse brute:", text);
-        try {
-          const errorData = JSON.parse(text);
-          toast.error(errorData.message || 'Erreur lors de la génération de la facture');
-        } catch {
-          toast.error('Erreur lors de la génération de la facture');
-        }
-      } else {
-        toast.error(error.response?.data?.message || 'Erreur lors du téléchargement de la facture');
-      }
-    }
-
-  }
 
   if (loading) {
     return (
@@ -241,7 +235,7 @@ export function VentesSection() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
+          <Button 
             variant="outline"
             onClick={handleRefresh}
             disabled={refreshing}
@@ -272,7 +266,7 @@ export function VentesSection() {
                         <SelectContent>
                           {stock.map((s: any) => (
                             <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.achat?.nom_service}
+                              {s.nom_produit} - Stock: {s.quantite}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -293,46 +287,36 @@ export function VentesSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="client">Client *</Label>
-                    <Input
-                      id="client"
-                      type="text"
-                      placeholder="Nom complet"
-                      value={client}
-                      onChange={(e) => setClient(e.target.value)}
-                      min="1"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="client">Numero *</Label>
-                    <Input
-                      id="numero"
-                      type="text"
-                      placeholder="+225 07 01 02 03 04"
-                      value={numero}
-                      onChange={(e) => setNumero(e.target.value)}
-                      min="1"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="client">Adresse *</Label>
-                    <Input
-                      id="adresse"
-                      type="text"
-                      placeholder="Ex: Yopougon"
-                      value={adresse}
-                      onChange={(e) => setAdresse(e.target.value)}
-                      min="1"
-                      required
-                    />
+                    {clients && clients.length > 0 ? (
+                      <Select value={clientId} onValueChange={setClientId} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((c: any) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>
+                              {c.nom} {c.prenom}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Select disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Aucun client disponible" />
+                        </SelectTrigger>
+                      </Select>
+                    )}
+                    {clients.length === 0 && (
+                      <p className="text-sm text-red-500">
+                        Aucun client trouvé. Veuillez ajouter des clients.
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="quantite">Quantité *</Label>
-                    <Input
+                    <Input 
                       id="quantite"
                       type="number"
                       placeholder="1"
@@ -345,7 +329,7 @@ export function VentesSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="prixUnitaire">Prix unitaire (FCFA) *</Label>
-                    <Input
+                    <Input 
                       id="prixUnitaire"
                       type="number"
                       placeholder="Prix de vente"
@@ -354,39 +338,21 @@ export function VentesSection() {
                       min="0"
                       step="0.01"
                       required
-                      disabled
                     />
                     <p className="text-xs text-muted-foreground">
                       Prix automatiquement rempli selon l'article sélectionné
                     </p>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="prixUnitaire">Prix Total (FCFA) *</Label>
-                    <Input
-                      id="prixUnitaire"
-                      type="number"
-                      placeholder="Prix total"
-                      value={prixTotal}
-                      onChange={(e) => setPrixTotal(e.target.value)}
-                      min="0"
-                      step="0.01"
-                      disabled
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Prix automatiquement rempli selon la quantité sélectionnée
-                    </p>
-                  </div>
                 </div>
 
                 <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
+                  <Button 
+                    type="button" 
                     variant="outline"
                     onClick={() => {
                       setDialogOpen(false);
                       setStockId("");
-                      setClient("");
+                      setClientId("");
                       setQuantite("");
                       setPrixUnitaire("");
                     }}
@@ -515,7 +481,7 @@ export function VentesSection() {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center p-2 bg-muted/30 rounded">
                         <span className="text-sm">
-                          {vente.stock?.achat?.nom_service || 'Produit'} (x{vente.quantite})
+                          {vente.stock?.nom_produit || 'Produit'} (x{vente.quantite})
                         </span>
                         <span className="text-sm font-medium">{vente.prix_total} FCFA</span>
                       </div>
@@ -526,19 +492,13 @@ export function VentesSection() {
                   <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
                     <div>
                       <p className="text-sm text-muted-foreground">Total</p>
-                      <p className="text-xl font-bold text-success">{vente.prix_total} FcFA</p>
+                      <p className="text-xl font-bold text-success">{vente.total} FcFA</p>
                     </div>
                   </div>
 
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline">Modifier</Button>
-                    <Button
-                      onClick={() => handleDownloadFacture(vente.id)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      Facture PDF
-                    </Button>
+                    <Button size="sm" variant="outline">Facture PDF</Button>
                   </div>
                 </div>
               </CardContent>

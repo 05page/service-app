@@ -1,23 +1,138 @@
+import { useState, useEffect } from "react";
+import api from '../api/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, 
-  ShoppingCart, 
-  TrendingUp, 
-  Package, 
-  DollarSign, 
+import { Button } from "@/components/ui/button";
+import {
+  Users,
+  ShoppingCart,
+  TrendingUp,
+  Package,
+  DollarSign,
   UserCheck,
   Building,
+  RefreshCw,
   ClipboardList
 } from "lucide-react";
+import { toast } from 'sonner';
+
+
+type Stats = {
+  total_client: number;
+  nouveau_cient: number;
+  total_employe: number;
+  total_employe_inactifs: number;
+  total_personnels: number;
+  total_fournisseurs: number;
+  // total_fournisseurs_inactif: number;
+  // nouveaux_fournisseurs_mois: number;
+  total_produits_stock: number;
+  chiffres_affaire_total: number;
+  total_ventes: number
+};
 
 export const DashboardAdmin = () => {
+  const [refreshing, setRefreshing] = useState(false)
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true)
+
+
+  const fecthDashboard = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error('Pas de token trouvé');
+        return;
+      }
+      console.log(token)
+      const response = await api.get('/dashboard');
+      setStats(response.data.data);
+    } catch (error) {
+      console.error('Erreur de récupération du dashboard', error);
+
+      if (error.response?.status === 401) {
+        console.error('token invalide ou expiré');
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fecthDashboard();
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fecthDashboard();
+      toast.success('Données actualisées')
+    } catch (error) {
+      toast.error('Erreur lors de l\'actualisation');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Chargement des statistiques...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-lg">
+          <CardContent className="flex flex-col items-center justify-center p-8 text-center">
+            <div className="bg-muted rounded-full p-4 mb-4">
+              <ClipboardList className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <CardTitle className="text-xl mb-2 text-foreground">
+              Aucune statistique disponible
+            </CardTitle>
+            <p className="text-muted-foreground mb-6 leading-relaxed">
+              Les données du tableau de bord ne sont pas disponibles pour le moment.
+              Vérifiez votre connexion et réessayez.
+            </p>
+            <Button
+              onClick={fecthDashboard}
+              className="flex items-center gap-2"
+              disabled={loading}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Actualiser les données
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
   return (
     <div className="space-y-8">
+      <div className="flex justify-between items-center">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Tableau de bord Administrateur</h1>
         <p className="text-muted-foreground">Vue d'ensemble complète de votre activité commerciale</p>
+        </div>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
       </div>
+
 
       {/* Stats principales */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -29,10 +144,10 @@ export const DashboardAdmin = () => {
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">145 320 €</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-card-foreground">{stats?.chiffres_affaire_total}</div>
+            {/* <p className="text-xs text-muted-foreground">
               +12.5% par rapport au mois dernier
-            </p>
+            </p> */}
           </CardContent>
         </Card>
 
@@ -44,10 +159,10 @@ export const DashboardAdmin = () => {
             <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">2,847</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-card-foreground">{stats?.total_client}</div>
+            {/* <p className="text-xs text-muted-foreground">
               +8.2% par rapport au mois dernier
-            </p>
+            </p> */}
           </CardContent>
         </Card>
 
@@ -59,14 +174,14 @@ export const DashboardAdmin = () => {
             <ShoppingCart className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">1,234</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-card-foreground">{stats?.total_ventes}</div>
+            {/* <p className="text-xs text-muted-foreground">
               +15.3% par rapport au mois dernier
-            </p>
+            </p> */}
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        {/* <Card className="border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Commissions à payer
@@ -79,7 +194,7 @@ export const DashboardAdmin = () => {
               Pour ce mois
             </p>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Sections de gestion */}
@@ -97,16 +212,16 @@ export const DashboardAdmin = () => {
           <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-card-foreground">Employés actifs</span>
-              <Badge variant="secondary">24</Badge>
+              <Badge variant="secondary">{stats?.total_employe}</Badge>
             </div>
-            <div className="flex justify-between items-center">
+            {/* <div className="flex justify-between items-center">
               <span className="text-sm text-card-foreground">En congé</span>
               <Badge variant="outline">3</Badge>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        {/* <Card className="border-border bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-card-foreground">
               <UserCheck className="h-5 w-5 text-primary" />
@@ -126,7 +241,7 @@ export const DashboardAdmin = () => {
               <Badge variant="outline">4.2%</Badge>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         <Card className="border-border bg-card">
           <CardHeader>
@@ -141,12 +256,12 @@ export const DashboardAdmin = () => {
           <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-card-foreground">Fournisseurs actifs</span>
-              <Badge variant="secondary">42</Badge>
+              <Badge variant="secondary">{stats?.total_fournisseurs}</Badge>
             </div>
-            <div className="flex justify-between items-center">
+            {/* <div className="flex justify-between items-center">
               <span className="text-sm text-card-foreground">Commandes en cours</span>
               <Badge variant="outline">18</Badge>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
 
@@ -163,58 +278,15 @@ export const DashboardAdmin = () => {
           <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-card-foreground">Articles en stock</span>
-              <Badge variant="secondary">1,847</Badge>
+              <Badge variant="secondary">{stats?.total_produits_stock}</Badge>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-card-foreground">Stock faible</span>
-              <Badge variant="destructive">7</Badge>
+              <Badge variant="destructive">{stats?.total_stock_faible}</Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-card-foreground">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              Rapports & Analytics
-            </CardTitle>
-            <CardDescription>
-              Analyses détaillées et rapports
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">Rapports générés</span>
-              <Badge variant="secondary">45</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">Alertes actives</span>
-              <Badge variant="outline">2</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-card-foreground">
-              <DollarSign className="h-5 w-5 text-primary" />
-              Finances
-            </CardTitle>
-            <CardDescription>
-              Vue financière globale
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">Marge brute</span>
-              <Badge variant="secondary">32.5%</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">Impayés</span>
-              <Badge variant="destructive">2,340 €</Badge>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from '../api/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 interface ArticleStock {
   id: string;
@@ -32,6 +33,153 @@ export function StockSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategorie, setSelectedCategorie] = useState<string>("tous");
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [stock, setStock] = useState(null);
+  const [selectStock, setSelectStock] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [achatId, setAchatId] = useState<any[]>([]);
+
+  //Formulaire
+  const [achat, setAchat] = useState("");
+  const [categorie, setCategorie] = useState("");
+  const [quantite, setQuantite] = useState("");
+  const [quantiMin, setQuantiteMin] = useState("")
+  const [prixAchat, setPrixAchat] = useState("");
+  const [prixVente, setPrixVente] = useState("");
+  const [description, setDescription] = useState("");
+
+  const fetchStock = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("Token non trouvé")
+        return
+      }
+      const response = await api.get('/allStats');
+      setStock(response.data.data);
+
+      const res = await api.get('/achat');
+      console.log('Réponse achats:', res.data.data);
+      if (res.data.success && res.data.data) {
+        console.log("Nombre d'achat trouvés:", res.data.data.length);
+        setAchatId(res.data.data)
+      } else {
+        console.warn('Aucun achat trouvé');
+        setAchatId([]);
+      }
+
+    } catch (error: any) {
+      console.error('Erreur survenue lors de la récupération du stock', error)
+      if (error.response?.status === 401) {
+        toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
+        window.location.href = '/auth'
+      } else if (error.response?.status === 403) {
+        toast.error('Accès refusé')
+      } else {
+        toast.error('Erreur lors du chargement des données');
+      }
+
+      setAchatId([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const getStock = async () => {
+    try {
+      const response = await api.get('/stock/');
+      setSelectStock(response.data.data);
+    } catch (error) {
+      console.error('Erreur survenue lors de la récupération', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchStock();
+    getStock();
+  }, []);
+
+  useEffect(() => {
+    if (achat) {
+      const achatSelectionne = achatId.find(a => a.id === parseInt(achat));
+      console.log('Achat sélectionné:', achatSelectionne);
+      if (achatSelectionne) {
+        setQuantite(String(achatSelectionne.quantite));
+        setPrixAchat(String(achatSelectionne.prix_unitaire)); // Récupérer aussi le prix d'achat
+        console.log('Quantité mise à jour:', achatSelectionne.quantite);
+      }
+    }
+  }, [achat, achatId]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchStock();
+      await getStock();
+      toast.success('Données actualisées')
+    } catch (error) {
+      toast.error('Erreur lors de l\'actualisation');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    console.log('Données du formulaire:', {
+      achat,
+      categorie,
+      quantite,
+      quantiMin,
+      prixVente,
+      description
+    });
+
+    if (!achat || !categorie || !quantite || !quantiMin || !prixVente) {
+      toast.error('Veuillez remplir tous les champs obligatoires')
+      return
+    }
+
+    try {
+      const stockData = {
+        achat_id: parseInt(achat), // S'assurer que c'est un entier
+        categorie,
+        quantite: parseInt(quantite), // CORRECTION: Ajouter la quantité
+        quantite_min: parseInt(quantiMin),
+        prix_vente: parseFloat(prixVente),
+        description: description || null
+      };
+
+      console.log('Données envoyées à l\'API:', stockData);
+
+      const response = await api.post('/stock/', stockData);
+
+      toast.success(response.data.message || "Stock ajouté avec succès");
+
+      // Réinitialiser le formulaire
+      setAchat("");
+      setCategorie("");
+      setQuantite("");
+      setQuantiteMin("");
+      setPrixAchat("");
+      setPrixVente("");
+      setDescription("");
+
+      fetchStock();
+      getStock();
+      setDialogOpen(false);
+
+    } catch (error: any) {
+      console.error('Erreur création stock:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de l'ajout du stock";
+      toast.error(message);
+    }
+  }
 
   const articles: ArticleStock[] = [
     {
@@ -102,17 +250,12 @@ export function StockSection() {
 
   const filteredArticles = articles.filter(article => {
     const matchesSearch = article.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         article.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         article.fournisseur.toLowerCase().includes(searchTerm.toLowerCase());
+      article.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      article.fournisseur.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategorie = selectedCategorie === "tous" || article.categorie === selectedCategorie;
     const matchesStatut = selectedStatut === "tous" || article.statut === selectedStatut;
     return matchesSearch && matchesCategorie && matchesStatut;
   });
-
-  const totalArticles = articles.length;
-  const articlesDisponibles = articles.filter(a => a.statut === "disponible").length;
-  const articlesAlerte = articles.filter(a => a.statut === "alerte" || a.statut === "rupture").length;
-  const valeurStock = articles.reduce((sum, article) => sum + (article.quantiteStock * article.prixAchat), 0);
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
@@ -144,28 +287,18 @@ export function StockSection() {
     }
   };
 
-  const getStatutFromQuantite = (quantite: number, min: number) => {
-    if (quantite === 0) return "rupture";
-    if (quantite <= min) return "alerte";
-    return "disponible";
-  };
-
-  const getProgressValue = (quantite: number, max: number) => {
-    return Math.min((quantite / max) * 100, 100);
-  };
-
-  const getProgressColor = (statut: string) => {
-    switch (statut) {
-      case "disponible":
-        return "bg-green-500";
-      case "alerte":
-        return "bg-orange-500";
-      case "rupture":
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Chargement du stock...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -174,72 +307,163 @@ export function StockSection() {
           <h1 className="text-3xl font-bold tracking-tight">Stock</h1>
           <p className="text-muted-foreground">Gérez votre inventaire de services et produits</p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouvel Article
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Ajouter un nouvel article au stock</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="nom">Nom de l'article</Label>
-                <Input id="nom" placeholder="Nom du produit/service" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reference">Référence</Label>
-                <Input id="reference" placeholder="REF-001" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="categorie">Catégorie</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une catégorie" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="logiciels">Logiciels</SelectItem>
-                    <SelectItem value="hebergement">Hébergement</SelectItem>
-                    <SelectItem value="securite">Sécurité</SelectItem>
-                    <SelectItem value="services">Services</SelectItem>
-                    <SelectItem value="materiel">Matériel</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fournisseur">Fournisseur</Label>
-                <Input id="fournisseur" placeholder="Nom du fournisseur" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantite">Quantité initiale</Label>
-                <Input id="quantite" type="number" placeholder="10" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantiteMin">Quantité minimale</Label>
-                <Input id="quantiteMin" type="number" placeholder="5" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prixAchat">Prix d'achat (€)</Label>
-                <Input id="prixAchat" type="number" placeholder="100" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prixVente">Prix de vente (€)</Label>
-                <Input id="prixVente" type="number" placeholder="150" />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea id="description" placeholder="Description détaillée de l'article" />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline">Annuler</Button>
-              <Button>Ajouter à l'inventaire</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvel Article
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Ajouter un nouvel article au stock</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="achat">Achat *</Label>
+                    {achatId && achatId.length > 0 ? (
+                      <Select value={achat} onValueChange={setAchat} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner l'achat à ajouter au stock" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {achatId?.map((a: any) => (
+                            <SelectItem key={a.id} value={a.id.toString()}>
+                              {a.numero_achat} - {a.nom_service}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Select disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Aucun achat disponible" />
+                        </SelectTrigger>
+                      </Select>
+                    )}
+                    {achatId.length === 0 && (
+                      <p className="text-sm text-red-500">
+                        Aucun achat trouvé. Veuillez effectuer un achat
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="categorie">Catégorie *</Label>
+                    <Select value={categorie} onValueChange={setCategorie} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="logiciels">Logiciels</SelectItem>
+                        <SelectItem value="hebergement">Hébergement</SelectItem>
+                        <SelectItem value="securite">Sécurité</SelectItem>
+                        <SelectItem value="services">Services</SelectItem>
+                        <SelectItem value="materiel">Matériel</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantite">Quantité initiale *</Label>
+                    <Input
+                      id="quantite"
+                      type="number"
+                      value={quantite}
+                      onChange={(e) => setQuantite(e.target.value)}
+                      placeholder="Quantité récupérée de l'achat"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Cette quantité sera automatiquement remplie selon l'achat sélectionné
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantiteMin">Quantité minimale *</Label>
+                    <Input
+                      id="quantiteMin"
+                      value={quantiMin}
+                      onChange={(e) => setQuantiteMin(e.target.value)}
+                      type="number"
+                      placeholder="5"
+                      min="1"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prixAchat">Prix d'achat (FCFA)</Label>
+                    <Input
+                      id="prixAchat"
+                      type="number"
+                      value={prixAchat}
+                      placeholder="Prix d'achat automatique"
+                      disabled
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prixVente">Prix de vente (FCFA) *</Label>
+                    <Input
+                      id="prixVente"
+                      value={prixVente}
+                      onChange={(e) => setPrixVente(e.target.value)}
+                      type="number"
+                      placeholder="150"
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Description détaillée de l'article"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      // Réinitialiser le formulaire
+                      setAchat("");
+                      setCategorie("");
+                      setQuantite("");
+                      setQuantiteMin("");
+                      setPrixAchat("");
+                      setPrixVente("");
+                      setDescription("");
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit">
+                    Ajouter à l'inventaire
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Statistiques */}
@@ -250,7 +474,7 @@ export function StockSection() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalArticles}</div>
+            <div className="text-2xl font-bold">{stock?.total_produits_stock || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -259,7 +483,7 @@ export function StockSection() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{articlesDisponibles}</div>
+            <div className="text-2xl font-bold text-green-600">{stock?.total_stock_disponible || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -268,7 +492,7 @@ export function StockSection() {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{articlesAlerte}</div>
+            <div className="text-2xl font-bold text-orange-600">{stock?.total_stock_faible || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -277,7 +501,7 @@ export function StockSection() {
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{valeurStock.toLocaleString()} €</div>
+            <div className="text-2xl font-bold">{stock?.total_valeur_stock?.toLocaleString() || 0} Fcfa</div>
           </CardContent>
         </Card>
       </div>
@@ -330,59 +554,36 @@ export function StockSection() {
             <TableHeader>
               <TableRow>
                 <TableHead>Article</TableHead>
-                <TableHead>Catégorie</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Niveau</TableHead>
                 <TableHead>Prix d'achat</TableHead>
                 <TableHead>Prix de vente</TableHead>
-                <TableHead>Marge</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredArticles.map((article) => {
-                const statut = getStatutFromQuantite(article.quantiteStock, article.quantiteMinimale);
-                const marge = ((article.prixVente - article.prixAchat) / article.prixAchat * 100).toFixed(1);
-                return (
-                  <TableRow key={article.id}>
+              {selectStock && selectStock.length > 0 ? (
+                selectStock.map((s) => (
+                  <TableRow key={s.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{article.nom}</div>
-                        <div className="text-sm text-muted-foreground">{article.reference}</div>
-                        <div className="text-xs text-muted-foreground">{article.fournisseur}</div>
+                        <div className="font-medium">{s.nom_produit}</div>
+                        <div className="text-sm text-muted-foreground">{s?.code_produit}</div>
                       </div>
                     </TableCell>
-                    <TableCell>{article.categorie}</TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="font-medium">{article.quantiteStock} unités</div>
-                        <div className="text-muted-foreground">
-                          Min: {article.quantiteMinimale} | Max: {article.quantiteMaximale}
+                        <div className="font-medium">{s?.quantite} unités</div>
+                        <div className="text-muted-foreground text-xs">
+                          Min: {s?.quantite_min}
                         </div>
                       </div>
                     </TableCell>
+                    <TableCell>{s?.prix_achat} Fcfa</TableCell>
+                    <TableCell>{s?.prix_vente} Fcfa</TableCell>
                     <TableCell>
-                      <div className="space-y-2">
-                        <Progress 
-                          value={getProgressValue(article.quantiteStock, article.quantiteMaximale)} 
-                          className="h-2"
-                        />
-                        <div className="text-xs text-muted-foreground">
-                          {Math.round((article.quantiteStock / article.quantiteMaximale) * 100)}%
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{article.prixAchat.toLocaleString()} €</TableCell>
-                    <TableCell>{article.prixVente.toLocaleString()} €</TableCell>
-                    <TableCell>
-                      <span className={`text-sm font-medium ${parseFloat(marge) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        +{marge}%
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatutColor(statut)}>
-                        {getStatutLabel(statut)}
+                      <Badge variant={getStatutColor(s?.statut)}>
+                        {getStatutLabel(s?.statut)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -396,8 +597,14 @@ export function StockSection() {
                       </div>
                     </TableCell>
                   </TableRow>
-                );
-              })}
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-6">
+                    Aucun article en stock
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

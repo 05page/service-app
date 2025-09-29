@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from '../api/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,101 +9,206 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Search, Edit, Trash2, Phone, Mail, User, Calendar } from "lucide-react";
-
-interface Employe {
-  id: string;
-  nom: string;
-  prenom: string;
-  email: string;
-  telephone: string;
-  poste: string;
-  departement: string;
-  statut: "actif" | "inactif" | "conge";
-  dateEmbauche: string;
-  salaire: number;
-  ventesRealisees: number;
-  objectifMensuel: number;
-}
+import { Plus, Search, Edit, Trash2, Phone, Mail, User, Calendar, RefreshCw, Power, PowerOff } from "lucide-react";
+import { toast } from "sonner";
 
 export function PersonnelSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartement, setSelectedDepartement] = useState<string>("tous");
 
-  const employes: Employe[] = [
-    {
-      id: "1",
-      nom: "Martin",
-      prenom: "Jean",
-      email: "jean.martin@entreprise.com",
-      telephone: "+33 1 23 45 67 89",
-      poste: "Commercial Senior",
-      departement: "Ventes",
-      statut: "actif",
-      dateEmbauche: "2023-03-15",
-      salaire: 3500,
-      ventesRealisees: 15,
-      objectifMensuel: 20
-    },
-    {
-      id: "2",
-      nom: "Dubois",
-      prenom: "Marie",
-      email: "marie.dubois@entreprise.com",
-      telephone: "+33 1 98 76 54 32",
-      poste: "Responsable Marketing",
-      departement: "Marketing",
-      statut: "actif",
-      dateEmbauche: "2022-11-20",
-      salaire: 4200,
-      ventesRealisees: 22,
-      objectifMensuel: 25
-    },
-    {
-      id: "3",
-      nom: "Bernard",
-      prenom: "Pierre",
-      email: "pierre.bernard@entreprise.com",
-      telephone: "+33 4 56 78 90 12",
-      poste: "Technicien Support",
-      departement: "Technique",
-      statut: "conge",
-      dateEmbauche: "2023-07-10",
-      salaire: 2800,
-      ventesRealisees: 8,
-      objectifMensuel: 12
-    }
-  ];
+  const [statsPersonnel, setStatsPersonnel] = useState(null);
+  const [personnels, setPersonnels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
 
-  const filteredEmployes = employes.filter(employe => {
-    const matchesSearch = `${employe.prenom} ${employe.nom}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         employe.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         employe.poste.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDepartement = selectedDepartement === "tous" || employe.departement === selectedDepartement;
-    return matchesSearch && matchesDepartement;
-  });
+  // Formulaire
+  const [fullname, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [adresse, setAdresse] = useState("");
 
-  const totalEmployes = employes.length;
-  const employesActifs = employes.filter(e => e.statut === "actif").length;
-  const moyenneSalaire = Math.round(employes.reduce((sum, e) => sum + e.salaire, 0) / employes.length);
-  const totalVentes = employes.reduce((sum, e) => sum + e.ventesRealisees, 0);
+  const getStatsPersonnels = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token non trouvé');
+        return;
+      }
 
-  const getStatutColor = (statut: string) => {
-    switch (statut) {
-      case "actif":
-        return "default";
-      case "conge":
-        return "secondary";
-      case "inactif":
-        return "destructive";
-      default:
-        return "secondary";
+      const response = await api.get('/dashboard');
+      setStatsPersonnel(response.data.data);
+
+      const responses = await api.get('/admin/showEmploye');
+      setPersonnels(responses.data.data || []);
+    } catch (error: any) {
+      console.log('erreur de récupération', error);
+      if (error.response?.status === 401) {
+        toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
+      } else if (error.response?.status === 403) {
+        toast.error('Accès refusé');
+      } else {
+        toast.error('Erreur lors du chargement des données');
+      }
+      setPersonnels([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getInitials = (prenom: string, nom: string) => {
-    return `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase();
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await getStatsPersonnels();
+      toast.success('Données actualisées');
+    } catch (error) {
+      toast.error('Erreur lors de l\'actualisation');
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fullname || !email || !telephone || !adresse) {
+      toast.error('Veuillez remplir tous les champs');
+      return;
+    }
+
+    try {
+      const response = await api.post('/admin/createUser', {
+        fullname,
+        email,
+        telephone,
+        adresse
+      });
+
+      toast.success(response.data.message);
+      resetForm();
+      setDialogOpen(false);
+      getStatsPersonnels();
+    } catch (error: any) {
+      console.error(error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de l'ajout de l'employé";
+      toast.error(message);
+    }
+  };
+
+  const handleEdit = (employee: any) => {
+    setSelectedEmployee(employee);
+    setFullName(employee.fullname || "");
+    setEmail(employee.email || "");
+    setTelephone(employee.telephone || "");
+    setAdresse(employee.adresse || "");
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedEmployee) return;
+    
+    if (!fullname || !email || !telephone || !adresse) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    try {
+      const response = await api.put(`/admin/updateUser/${selectedEmployee.id}`, {
+        fullname,
+        email,
+        telephone,
+        adresse
+      });
+
+      toast.success(response.data.message || 'Employé mis à jour avec succès');
+      resetForm();
+      setSelectedEmployee(null);
+      setEditDialogOpen(false);
+      getStatsPersonnels();
+      
+    } catch (error: any) {
+      console.error('Erreur mise à jour employé:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de la mise à jour de l'employé";
+      toast.error(message);
+    }
+  };
+
+  const handleDelete = async (employeeId: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet employé ?')) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/admin/deleteUser/${employeeId}`);
+      toast.success(response.data.message || 'Employé supprimé avec succès');
+      getStatsPersonnels();
+    } catch (error: any) {
+      console.error('Erreur suppression employé:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de la suppression de l'employé";
+      toast.error(message);
+    }
+  };
+
+  const handleToggleStatus = async (employeeId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
+    const action = newStatus ? 'activer' : 'désactiver';
+    
+    if (!window.confirm(`Êtes-vous sûr de vouloir ${action} cet employé ?`)) {
+      return;
+    }
+    
+    try {
+      const response = await api.patch(`/admin/toggleUserStatus/${employeeId}`, {
+        active: newStatus
+      });
+      
+      toast.success(`Employé ${action} avec succès`);
+      getStatsPersonnels();
+    } catch (error: any) {
+      console.error('Erreur changement statut:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors du changement de statut";
+      toast.error(message);
+    }
+  };
+
+  const resetForm = () => {
+    setFullName("");
+    setEmail("");
+    setTelephone("");
+    setAdresse("");
+  };
+
+  useEffect(() => {
+    getStatsPersonnels();
+  }, []);
+
+  const getStatutColor = (statut: boolean) => {
+    return statut ? "default" : "destructive";
+  };
+
+  const getInitials = (fullname: string) => {
+    const names = fullname.split(' ');
+    if (names.length >= 2) {
+      return `${names[0].charAt(0)}${names[1].charAt(0)}`.toUpperCase();
+    }
+    return fullname.charAt(0).toUpperCase();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Chargement du personnel...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -111,67 +217,161 @@ export function PersonnelSection() {
           <h1 className="text-3xl font-bold tracking-tight">Personnel</h1>
           <p className="text-muted-foreground">Gérez votre équipe et leurs performances</p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouvel Employé
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Ajouter un nouvel employé</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="prenom">Prénom</Label>
-                <Input id="prenom" placeholder="Prénom" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nom">Nom</Label>
-                <Input id="nom" placeholder="Nom" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="email@entreprise.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telephone">Téléphone</Label>
-                <Input id="telephone" placeholder="+33 1 23 45 67 89" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="poste">Poste</Label>
-                <Input id="poste" placeholder="Ex: Commercial Senior" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="departement">Département</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un département" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ventes">Ventes</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="technique">Technique</SelectItem>
-                    <SelectItem value="administration">Administration</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salaire">Salaire (€)</Label>
-                <Input id="salaire" type="number" placeholder="3000" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="objectif">Objectif mensuel</Label>
-                <Input id="objectif" type="number" placeholder="20" />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline">Annuler</Button>
-              <Button>Ajouter</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvel Employé
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Ajouter un nouvel employé</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullname">Nom complet *</Label>
+                    <Input 
+                      id="fullname"
+                      value={fullname}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Nom complet"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input 
+                      id="email" 
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="email@entreprise.com"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="telephone">Téléphone *</Label>
+                    <Input 
+                      id="telephone"
+                      value={telephone}
+                      onChange={(e) => setTelephone(e.target.value)}
+                      placeholder="+225 01 02 03 04 05"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adresse">Adresse *</Label>
+                    <Input 
+                      id="adresse"
+                      value={adresse}
+                      onChange={(e) => setAdresse(e.target.value)}
+                      placeholder="Yopougon"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setDialogOpen(false);
+                      resetForm();
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit">Ajouter</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog d'édition */}
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Modifier l'employé</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleUpdate}>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-fullname">Nom complet *</Label>
+                    <Input 
+                      id="edit-fullname"
+                      value={fullname}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Nom complet"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-email">Email *</Label>
+                    <Input 
+                      id="edit-email" 
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="email@entreprise.com"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-telephone">Téléphone *</Label>
+                    <Input 
+                      id="edit-telephone"
+                      value={telephone}
+                      onChange={(e) => setTelephone(e.target.value)}
+                      placeholder="+225 01 02 03 04 05"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-adresse">Adresse *</Label>
+                    <Input 
+                      id="edit-adresse"
+                      value={adresse}
+                      onChange={(e) => setAdresse(e.target.value)}
+                      placeholder="Yopougon"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setEditDialogOpen(false);
+                      setSelectedEmployee(null);
+                      resetForm();
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit">Mettre à jour</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Statistiques */}
@@ -182,7 +382,7 @@ export function PersonnelSection() {
             <User className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalEmployes}</div>
+            <div className="text-2xl font-bold">{statsPersonnel?.total_employe || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -190,15 +390,7 @@ export function PersonnelSection() {
             <CardTitle className="text-sm font-medium">Employés Actifs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{employesActifs}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Salaire Moyen</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{moyenneSalaire.toLocaleString()} €</div>
+            <div className="text-2xl font-bold text-green-600">{statsPersonnel?.total_employe_actif || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -206,7 +398,7 @@ export function PersonnelSection() {
             <CardTitle className="text-sm font-medium">Ventes ce mois</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalVentes}</div>
+            <div className="text-2xl font-bold">{statsPersonnel?.total_ventes_employes || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -249,75 +441,108 @@ export function PersonnelSection() {
               <TableRow>
                 <TableHead>Employé</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Poste</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead>Performance</TableHead>
-                <TableHead>Salaire</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEmployes.map((employe) => (
-                <TableRow key={employe.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <Avatar>
-                        <AvatarImage src="" />
-                        <AvatarFallback>{getInitials(employe.prenom, employe.nom)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{employe.prenom} {employe.nom}</div>
-                        <div className="text-sm text-muted-foreground flex items-center">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          Depuis {new Date(employe.dateEmbauche).toLocaleDateString('fr-FR')}
+              {personnels && personnels.length > 0 ? (
+                personnels.map((employe: any) => (
+                  <TableRow key={employe.id}>
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        <Avatar>
+                          <AvatarImage src="" />
+                          <AvatarFallback>{getInitials(employe.fullname)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{employe.fullname}</div>
+                          <div className="text-sm text-muted-foreground flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            Depuis {new Date(employe.created_at).toLocaleDateString('fr-FR')}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center text-sm">
-                        <Mail className="h-3 w-3 mr-1" />
-                        {employe.email}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-3 w-3 mr-1" />
+                          {employe.email}
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <Phone className="h-3 w-3 mr-1" />
+                          {employe.telephone}
+                        </div>
                       </div>
-                      <div className="flex items-center text-sm">
-                        <Phone className="h-3 w-3 mr-1" />
-                        {employe.telephone}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatutColor(employe.active)}>
+                        {employe.active ? "Actif" : "Inactif"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEdit(employe)}
+                          title="Modifier"
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDelete(employe.id)}
+                          title="Supprimer"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                        {employe.active ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleToggleStatus(employe.id, employe.active)}
+                            title="Désactiver"
+                            className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
+                          >
+                            <PowerOff className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleToggleStatus(employe.id, employe.active)}
+                            title="Activer"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
+                          >
+                            <Power className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{employe.poste}</div>
-                      <div className="text-sm text-muted-foreground">{employe.departement}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatutColor(employe.statut)}>
-                      {employe.statut}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{employe.ventesRealisees} / {employe.objectifMensuel} ventes</div>
-                      <div className="text-muted-foreground">
-                        {Math.round((employe.ventesRealisees / employe.objectifMensuel) * 100)}% de l'objectif
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{employe.salaire.toLocaleString()} €</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-12">
+                    <User className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
+                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                      Aucun employé disponible
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center mb-6">
+                      Vous n'avez pas encore d'employé dans votre équipe. Ajoutez votre premier employé pour commencer.
+                    </p>
+                    <Button onClick={() => setDialogOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Ajouter mon premier employé
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>
