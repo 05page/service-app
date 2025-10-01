@@ -142,7 +142,7 @@ export function PersonnelSection() {
     }
 
     try {
-      const response = await api.delete(`/admin/deleteUser/${employeeId}`);
+      const response = await api.delete(`/admin/deleteEmploye/${employeeId}`);
       toast.success(response.data.message || 'Employé supprimé avec succès');
       getStatsPersonnels();
     } catch (error: any) {
@@ -161,7 +161,7 @@ export function PersonnelSection() {
     }
     
     try {
-      const response = await api.patch(`/admin/toggleUserStatus/${employeeId}`, {
+      const response = await api.post(`/admin/toggleUserStatus/${employeeId}`, {
         active: newStatus
       });
       

@@ -7,8 +7,9 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import CreatePassword from "./pages/password";
+import CreatePassword from "./pages/Password";
 import ActivateAccount from "./pages/CodeActivation";
+import ForgotPassword from "./components/ForgotPassword";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/password" element={<CreatePassword />} />
           <Route path="/code" element={<ActivateAccount />} />
           <Route path="/dashboard" element={<Index />} />

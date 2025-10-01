@@ -50,9 +50,7 @@ export function ClientsSection() {
       console.log('Erreur de récupération', error);
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
-      } else if (error.response?.status === 403) {
-        toast.error('Accès refusé');
-      } else {
+      }else {
         toast.error('Erreur lors du chargement des clients');
       }
       setClient([]);
@@ -72,34 +70,6 @@ export function ClientsSection() {
       setRefreshing(false);
     }
   }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!nomClient || !numeroClient || !adresseClient) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-
-    try {
-      const response = await api.post('/clients/', {
-        nom: nomClient,
-        numero: numeroClient,
-        adresse: adresseClient,
-        email: emailClient || null
-      });
-
-      toast.success(response.data.message || 'Client ajouté avec succès');
-      resetForm();
-      setDialogOpen(false);
-      getClient();
-      
-    } catch (error: any) {
-      console.error('Erreur création client:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de l'ajout du client";
-      toast.error(message);
-    }
-  };
 
   const handleEdit = (clientItem: any) => {
     setSelectedClient(clientItem);
@@ -247,26 +217,6 @@ export function ClientsSection() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEdit(c)}
-                      title="Modifier"
-                      className="h-8 w-8 p-0"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDelete(c.id)}
-                      title="Supprimer"
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -296,12 +246,12 @@ export function ClientsSection() {
                       <span className="text-sm text-muted-foreground">Achats</span>
                       <span className="font-semibold">{c.nombre_ventes || 0}</span>
                     </div>
-                    <div className="flex gap-2 mt-4">
+                    {/* <div className="flex gap-2 mt-4">
                       <Button size="sm" variant="outline">
                         <TrendingUp className="h-4 w-4 mr-1" />
                         Historique
                       </Button>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </CardContent>

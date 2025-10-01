@@ -125,7 +125,7 @@ export function PermissionsSection() {
 
         try {
             const response = await api.post('/admin/createPermission', {
-                employe_id: parseInt(selectedEmployee),
+                user_id: parseInt(selectedEmployee),
                 module: selectedModule,
                 description: description
             });

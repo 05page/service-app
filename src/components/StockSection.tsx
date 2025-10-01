@@ -10,34 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-
-interface ArticleStock {
-  id: string;
-  nom: string;
-  reference: string;
-  categorie: string;
-  quantiteStock: number;
-  quantiteMinimale: number;
-  quantiteMaximale: number;
-  prixAchat: number;
-  prixVente: number;
-  fournisseur: string;
-  emplacement: string;
-  description: string;
-  dateEntree: string;
-  statut: "disponible" | "rupture" | "alerte" | "indisponible";
-}
 
 export function StockSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategorie, setSelectedCategorie] = useState<string>("tous");
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
   const [stock, setStock] = useState(null);
   const [selectStock, setSelectStock] = useState([]);
+  const [selectUpdateStock, setSelecUpdatetStock] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [achatId, setAchatId] = useState<any[]>([]);
 
@@ -50,6 +36,33 @@ export function StockSection() {
   const [prixVente, setPrixVente] = useState("");
   const [description, setDescription] = useState("");
 
+  //Delete
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [stockDelete, setStockDelete] = useState<any | null>(null);
+
+  const handleDeleteClick = (stock: any) => {
+    setStockDelete(stock);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (stockDelete) {
+      // Logique de suppression ici
+      try {
+        // Exemple d'appel API
+        await api.delete(`/stock/${stockDelete.id}`);
+        // Recharger les données
+        await fetchStock();
+        await getStock();
+        toast.success(`Produit ${stockDelete.code_produit} supprimé avec succès`);
+        setDeleteDialogOpen(false);
+        setStockDelete(null);
+      } catch (error: any) {
+        toast.error("Erreur lors de la suppression");
+        console.error(error.response?.data || error);
+      }
+    }
+  };
   const fetchStock = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -57,7 +70,9 @@ export function StockSection() {
         console.error("Token non trouvé")
         return
       }
-      const response = await api.get('/allStats');
+      const role = localStorage.getItem("userRole");
+      const endpoint = role === "admin" ? "/allStats" : "/stock/stats"
+      const response = await api.get(endpoint);
       setStock(response.data.data);
 
       const res = await api.get('/achat');
@@ -98,6 +113,97 @@ export function StockSection() {
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    console.log('Données du formulaire:', {
+      achat,
+      categorie,
+      quantite,
+      quantiMin,
+      prixVente,
+      description
+    });
+
+    if (!achat || !categorie || !quantite || !quantiMin || !prixVente) {
+      toast.error('Veuillez remplir tous les champs obligatoires')
+      return
+    }
+
+    try {
+      const stockData = {
+        achat_id: parseInt(achat), // S'assurer que c'est un entier
+        categorie,
+        quantite: parseInt(quantite), // CORRECTION: Ajouter la quantité
+        quantite_min: parseInt(quantiMin),
+        prix_vente: parseFloat(prixVente),
+        description: description || null
+      };
+
+      console.log('Données envoyées à l\'API:', stockData);
+
+      const response = await api.post('/stock', stockData);
+
+      toast.success(response.data.message || "Stock ajouté avec succès");
+
+      // Réinitialiser le formulaire
+      setAchat("");
+      setCategorie("");
+      setQuantite("");
+      setQuantiteMin("");
+      setPrixAchat("");
+      setPrixVente("");
+      setDescription("");
+
+      fetchStock();
+      getStock();
+      setDialogOpen(false);
+
+    } catch (error: any) {
+      console.error('Erreur création stock:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de l'ajout du stock";
+      toast.error(message);
+    }
+  }
+
+  const handleEdit = (updateStock: any) => {
+    setSelecUpdatetStock(updateStock)  // Notez le typo dans le nom de la fonction
+    setAchat(updateStock.achat_id?.toString() || "");
+    setCategorie(updateStock.categorie || "");
+    setQuantite(updateStock.quantite?.toString() || "");  // Ajoutez toString()
+    setQuantiteMin(updateStock.quantite_min?.toString() || "");  // Ajoutez toString()
+    setPrixVente(updateStock.prix_vente?.toString() || "");  // Ajoutez toString()
+    setDescription(updateStock.description || "");
+    setEditDialogOpen(true);  // Ouvrir le dialog ici
+  }
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectUpdateStock) return;
+    if (!achatId || !categorie || !quantite || !quantiMin || !prixVente) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    try {
+      const response = await api.put(`/stock/${selectUpdateStock.id}`, {
+        achat_id: parseInt(achat), // S'assurer que c'est un entier
+        categorie,
+        quantite: parseInt(quantite), // CORRECTION: Ajouter la quantité
+        quantite_min: parseInt(quantiMin),
+        prix_vente: parseFloat(prixVente),
+        description: description || null
+      });
+      toast.success(response.data.message || 'Stock mis à jour');
+      setSelecUpdatetStock(null)
+      setEditDialogOpen(false);
+    } catch (error: any) {
+      console.error(error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de mise à jour de du stock";
+      toast.error(message);
+    }
+  }
+
   useEffect(() => {
     fetchStock();
     getStock();
@@ -128,134 +234,15 @@ export function StockSection() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
 
-    console.log('Données du formulaire:', {
-      achat,
-      categorie,
-      quantite,
-      quantiMin,
-      prixVente,
-      description
-    });
-
-    if (!achat || !categorie || !quantite || !quantiMin || !prixVente) {
-      toast.error('Veuillez remplir tous les champs obligatoires')
-      return
-    }
-
-    try {
-      const stockData = {
-        achat_id: parseInt(achat), // S'assurer que c'est un entier
-        categorie,
-        quantite: parseInt(quantite), // CORRECTION: Ajouter la quantité
-        quantite_min: parseInt(quantiMin),
-        prix_vente: parseFloat(prixVente),
-        description: description || null
-      };
-
-      console.log('Données envoyées à l\'API:', stockData);
-
-      const response = await api.post('/stock/', stockData);
-
-      toast.success(response.data.message || "Stock ajouté avec succès");
-
-      // Réinitialiser le formulaire
-      setAchat("");
-      setCategorie("");
-      setQuantite("");
-      setQuantiteMin("");
-      setPrixAchat("");
-      setPrixVente("");
-      setDescription("");
-
-      fetchStock();
-      getStock();
-      setDialogOpen(false);
-
-    } catch (error: any) {
-      console.error('Erreur création stock:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de l'ajout du stock";
-      toast.error(message);
-    }
-  }
-
-  const articles: ArticleStock[] = [
-    {
-      id: "1",
-      nom: "Licence Office 365 Business",
-      reference: "OFF365-BUS-001",
-      categorie: "Logiciels",
-      quantiteStock: 25,
-      quantiteMinimale: 10,
-      quantiteMaximale: 50,
-      prixAchat: 120,
-      prixVente: 180,
-      fournisseur: "Microsoft Partner",
-      emplacement: "Stock Numérique",
-      description: "Licence Office 365 Business Standard pour 1 utilisateur, 1 an",
-      dateEntree: "2024-01-15",
-      statut: "disponible"
-    },
-    {
-      id: "2",
-      nom: "Serveur Cloud VPS",
-      reference: "VPS-CLOUD-002",
-      categorie: "Hébergement",
-      quantiteStock: 5,
-      quantiteMinimale: 3,
-      quantiteMaximale: 15,
-      prixAchat: 80,
-      prixVente: 150,
-      fournisseur: "CloudTech Solutions",
-      emplacement: "Datacenter France",
-      description: "Serveur VPS 4 CPU, 8GB RAM, 100GB SSD",
-      dateEntree: "2024-01-20",
-      statut: "alerte"
-    },
-    {
-      id: "3",
-      nom: "Certificat SSL Wildcard",
-      reference: "SSL-WILD-003",
-      categorie: "Sécurité",
-      quantiteStock: 0,
-      quantiteMinimale: 2,
-      quantiteMaximale: 10,
-      prixAchat: 200,
-      prixVente: 350,
-      fournisseur: "SecureSSL Pro",
-      emplacement: "Stock Numérique",
-      description: "Certificat SSL Wildcard valide 1 an",
-      dateEntree: "2024-01-10",
-      statut: "rupture"
-    },
-    {
-      id: "4",
-      nom: "Pack Maintenance Site Web",
-      reference: "MAINT-WEB-004",
-      categorie: "Services",
-      quantiteStock: 12,
-      quantiteMinimale: 5,
-      quantiteMaximale: 20,
-      prixAchat: 300,
-      prixVente: 500,
-      fournisseur: "WebCare Services",
-      emplacement: "Service Externe",
-      description: "Pack maintenance mensuelle pour site web",
-      dateEntree: "2024-01-25",
-      statut: "disponible"
-    }
-  ];
-
-  const filteredArticles = articles.filter(article => {
-    const matchesSearch = article.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.fournisseur.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategorie = selectedCategorie === "tous" || article.categorie === selectedCategorie;
-    const matchesStatut = selectedStatut === "tous" || article.statut === selectedStatut;
-    return matchesSearch && matchesCategorie && matchesStatut;
-  });
+  // const filteredArticles = articles.filter(article => {
+  //   const matchesSearch = article.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     article.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     article.fournisseur.toLowerCase().includes(searchTerm.toLowerCase());
+  //   const matchesCategorie = selectedCategorie === "tous" || article.categorie === selectedCategorie;
+  //   const matchesStatut = selectedStatut === "tous" || article.statut === selectedStatut;
+  //   return matchesSearch && matchesCategorie && matchesStatut;
+  // });
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
@@ -308,7 +295,7 @@ export function StockSection() {
           <p className="text-muted-foreground">Gérez votre inventaire de services et produits</p>
         </div>
         <div className="flex gap-2">
-          <Button 
+          <Button
             variant="outline"
             onClick={handleRefresh}
             disabled={refreshing}
@@ -328,6 +315,150 @@ export function StockSection() {
                 <DialogTitle>Ajouter un nouvel article au stock</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="achat">Achat *</Label>
+                    {achatId && achatId.length > 0 ? (
+                      <Select value={achat} onValueChange={setAchat} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner l'achat à ajouter au stock" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {achatId?.map((a: any) => (
+                            <SelectItem key={a.id} value={a.id.toString()}>
+                              {a.numero_achat} - {a.nom_service}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Select disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Aucun achat disponible" />
+                        </SelectTrigger>
+                      </Select>
+                    )}
+                    {achatId.length === 0 && (
+                      <p className="text-sm text-red-500">
+                        Aucun achat trouvé. Veuillez effectuer un achat
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="categorie">Catégorie *</Label>
+                    <Select value={categorie} onValueChange={setCategorie} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="logiciels">Logiciels</SelectItem>
+                        <SelectItem value="hebergement">Hébergement</SelectItem>
+                        <SelectItem value="securite">Sécurité</SelectItem>
+                        <SelectItem value="services">Services</SelectItem>
+                        <SelectItem value="materiel">Matériel</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantite">Quantité initiale *</Label>
+                    <Input
+                      id="quantite"
+                      type="number"
+                      value={quantite}
+                      onChange={(e) => setQuantite(e.target.value)}
+                      placeholder="Quantité récupérée de l'achat"
+                      required
+                      disabled
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Cette quantité sera automatiquement remplie selon l'achat sélectionné
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantiteMin">Quantité minimale *</Label>
+                    <Input
+                      id="quantiteMin"
+                      value={quantiMin}
+                      onChange={(e) => setQuantiteMin(e.target.value)}
+                      type="number"
+                      placeholder="5"
+                      min="1"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prixAchat">Prix d'achat (FCFA)</Label>
+                    <Input
+                      id="prixAchat"
+                      type="number"
+                      value={prixAchat}
+                      placeholder="Prix d'achat automatique"
+                      disabled
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prixVente">Prix de vente (FCFA) *</Label>
+                    <Input
+                      id="prixVente"
+                      value={prixVente}
+                      onChange={(e) => setPrixVente(e.target.value)}
+                      type="number"
+                      placeholder="150"
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Description détaillée de l'article"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      // Réinitialiser le formulaire
+                      setAchat("");
+                      setCategorie("");
+                      setQuantite("");
+                      setQuantiteMin("");
+                      setPrixAchat("");
+                      setPrixVente("");
+                      setDescription("");
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit">
+                    Ajouter à l'inventaire
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit */}
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Ajouter un nouvel article au stock</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleUpdate}>
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="achat">Achat *</Label>
@@ -443,7 +574,7 @@ export function StockSection() {
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      setDialogOpen(false);
+                      setEditDialogOpen(false);
                       // Réinitialiser le formulaire
                       setAchat("");
                       setCategorie("");
@@ -555,7 +686,7 @@ export function StockSection() {
               <TableRow>
                 <TableHead>Article</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Prix d'achat</TableHead>
+                {/* <TableHead>Prix d'achat</TableHead> */}
                 <TableHead>Prix de vente</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Actions</TableHead>
@@ -567,7 +698,7 @@ export function StockSection() {
                   <TableRow key={s.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{s.nom_produit}</div>
+                        <div className="font-medium">{s.achat?.nom_service}</div>
                         <div className="text-sm text-muted-foreground">{s?.code_produit}</div>
                       </div>
                     </TableCell>
@@ -579,7 +710,7 @@ export function StockSection() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{s?.prix_achat} Fcfa</TableCell>
+                    {/* <TableCell>{s?.prix_unitaire} Fcfa</TableCell> */}
                     <TableCell>{s?.prix_vente} Fcfa</TableCell>
                     <TableCell>
                       <Badge variant={getStatutColor(s?.statut)}>
@@ -588,10 +719,19 @@ export function StockSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
+                        <Button
+                          onClick={() => {
+                            handleEdit(s)
+                            setEditDialogOpen(true)
+                          }}
+                          variant="outline" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteClick(s)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -609,6 +749,24 @@ export function StockSection() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer la commande {stockDelete?.code_produit} ?
+              Cela supprimera toutes les ventes liées à ce stock !! Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div >
   );
 }

@@ -10,22 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign, RefreshCw, FileText } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
-
-
-interface Achat {
-  id: string;
-  numeroCommande: string;
-  fournisseur: string;
-  service: string;
-  quantite: number;
-  prixUnitaire: number;
-  montantTotal: number;
-  statut: "en_attente" | "confirme" | "recu" | "annule";
-  dateCommande: string;
-  dateLivraison?: string;
-  description: string;
-}
+import { parse } from 'date-fns';
 
 type Achats = {
   total_achat_commande: number,
@@ -52,11 +39,15 @@ export function AchatsSection() {
   const [typeService, setTypeService] = useState("");
   const [quantite, setQuantite] = useState("");
   const [prixUnitaire, setPrixUnitaire] = useState("")
+  const [prixTotal, setPrixTotal] = useState("")
   const [dateCommande, setDateCommande] = useState("");
   const [dateLivraison, setDateLivraison] = useState("");
   const [statut, setStatut] = useState("");
   const [description, setDescription] = useState("");
 
+  //Delete
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [achatDelete, setAchatDelete] = useState<any | null>(null);
 
   const fecthAchats = async () => {
     try {
@@ -67,7 +58,9 @@ export function AchatsSection() {
       console.log(token);
 
       //Réupération des stats
-      const response = await api.get('/allStats')
+      const role = localStorage.getItem("userRole");
+      const endpoint = role === "admin" ? "/allStats" : "/achat/stats";
+      const response = await api.get(endpoint);
       setSelectCount(response.data.data);
 
       //Récupération des fournisseurs 
@@ -82,13 +75,27 @@ export function AchatsSection() {
       }
     } catch (error: any) {
       console.error('Erreur de récupération', error);
-      if (error.response?.status === 401) {
-        toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
-        window.location.href = '/auth'
-      } else if (error.response?.status === 403) {
-        toast.error('Accès refusé')
+
+      if (error.response) {
+        // ✅ Erreur renvoyée par le backend
+        console.error("Status:", error.response.status);
+        console.error("Data:", error.response.data);
+        console.error("Headers:", error.response.headers);
+
+        if (error.response.status === 401) {
+          console.error('Token invalide ou expiré. Veuillez vous reconnecter');
+          window.location.href = '/auth';
+        } else {
+          console.error('Erreur API:', error.response.data.message || 'Erreur inconnue');
+        }
+
+      } else if (error.request) {
+        // ✅ Requête envoyée mais pas de réponse (timeout, serveur down, CORS…)
+        console.error("Pas de réponse du serveur:", error.request);
+
       } else {
-        toast.error('Erreur lors du chargement des données');
+        // ✅ Erreur côté front (bug JS, mauvaise config axios…)
+        console.error("Erreur front:", error.message);
       }
 
       setFournisseur([]);
@@ -103,7 +110,6 @@ export function AchatsSection() {
       setchAchat(response.data.data)
     } catch (error) {
       console.error('Erreur survenue lors de la récupération des achats', error);
-      toast.error('Erreur lors du chargement des achats. Veuillez réchargez la page');
       setchAchat([]);
     } finally {
       setLoading(false)
@@ -206,33 +212,86 @@ export function AchatsSection() {
     }
   }
 
-  const handleDelete = async(achatId: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet achat ?')) {
-      return;
-    }
-        try {
-          const response = await api.delete(`/achat/${achatId}`);
-          toast.success(response.data.message || 'Achat supprimé avec succès');
-          getAchats();
-          fecthAchats();
-        } catch (error: any) {
-          console.error('Erreur suppression achat:', error.response?.data);
-          const message = error.response?.data?.message || "Erreur lors de la suppression de l'achat";
-          toast.error(message);
-        }
+  const handleClick = (achat: any) => {
+    setAchatDelete(achat);
+    setDeleteDialogOpen(true)
   }
+
+  const handleDelete = async () => {
+    if (achatDelete) {
+      try {
+        await api.delete(`/achat/${achatDelete.id}`);
+        await fecthAchats();
+        await getAchats();
+        toast.success(`Achat${achatDelete?.numero_achat} supprimer avec succès`);
+      } catch (error: any) {
+        toast.error("Erreur lors de la suppression");
+        console.error(error.response?.data || error);
+      }
+    }
+  }
+
+  const handleDownloadFacture = async (achatId: string) => {
+    try {
+      toast.info('Génération de facture en cours...');
+      const response = await api.get(`factures/achat/${achatId}/pdf`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      document.body.appendChild(link);
+      link.href = url;
+      link.download = `facture-${achatId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url)
+
+      toast.success("Facture téléchargée avec succès")
+    } catch (error: any) {
+      if (error.response?.data instanceof Blob) {
+        const text = await error.response.data.text();
+        console.error("Réponse brute:", text);
+        try {
+          const errorData = JSON.parse(text);
+          toast.error(errorData.message || 'Erreur lors de la génération de la facture');
+        } catch {
+          toast.error("Erreur lors de la génération de la facture");
+        }
+      } else {
+        toast.error(error.response?.data?.message || 'Erreur lors du téléchargement de la facture')
+      }
+    }
+  }
+  // Ajoutez ce useEffect après les autres useEffect
+  useEffect(() => {
+    if (fournisseurId) {
+      const fournisseurSelectionne = fournisseur.find(f => f.id === parseInt(fournisseurId));
+      if (fournisseurSelectionne && fournisseurSelectionne.description) {
+        setTypeService(fournisseurSelectionne.description);
+      }
+    }
+  }, [fournisseurId, fournisseur]);
+
   useEffect(() => {
     fecthAchats();
     getAchats();
   }, []);
 
+  useEffect(()=>{
+    const q = parseInt(quantite) || 0;
+    const pU = parseFloat(prixUnitaire) || 0;
+    setPrixTotal((q * pU).toFixed(2))
+  }, [quantite, prixUnitaire])
+
   const getStatutColor = (statut: string) => {
     switch (statut) {
-      case "en_attente":
+      case "en attente":
         return "secondary";
-      case "confirme":
-        return "default";
-      case "recu":
+      case "reçu":
         return "default";
       case "annule":
         return "destructive";
@@ -243,7 +302,7 @@ export function AchatsSection() {
 
   const getStatutLabel = (statut: string) => {
     switch (statut) {
-      case "en_attente":
+      case "en  attente":
         return "En attente";
       case "confirme":
         return "Confirmé";
@@ -268,9 +327,6 @@ export function AchatsSection() {
       </div>
     );
   }
-  // Debug: vérifier l'état des fournisseurs
-  // console.log('Rendu composant - fournisseurs dans state:', fournisseur);
-  // console.log('Nombre de fournisseurs:', fournisseur?.length);
 
   return (
     <div className="space-y-6">
@@ -332,31 +388,17 @@ export function AchatsSection() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="service">Service *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
-                      <Select value={typeService} onValueChange={setTypeService} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="nom du service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseur.map((f: any) => (
-                            <SelectItem key={f.id} value={f.description}>
-                              {f.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className="text-sm text-red-500">
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord.
-                      </p>
-                    )}
+                    <Input
+                      id="service"
+                      value={typeService}
+                      onChange={(e) => setTypeService(e.target.value)}
+                      placeholder="Sélectionnez d'abord un fournisseur"
+                      disabled={!fournisseurId}
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Le service sera automatiquement rempli selon le fournisseur sélectionné
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="quantite">Quantité *</Label>
@@ -374,7 +416,7 @@ export function AchatsSection() {
                   <div className="space-y-2">
                     <Label htmlFor="prix">Prix total (FCFA)</Label>
                     <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
+                      value={prixTotal} onChange={(e) => setPrixTotal(e.target.value)}
                       type="number" min="100" placeholder="1000" disabled />
                   </div>
                   <div className="space-y-2">
@@ -547,40 +589,55 @@ export function AchatsSection() {
 
       {/* Statistiques */}
       <div className="grid gap-4 md:grid-cols-4">
+        {/* Total Commandes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Commandes</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{selectCount?.total_achat_commande || 0}</div>
+            <div className="text-2xl font-bold">
+              {(selectCount?.total_achat_commande ?? 0).toLocaleString()}
+            </div>
           </CardContent>
         </Card>
+
+        {/* Total Achat */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Achat</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{selectCount?.total_achats || 0}</div>
+            <div className="text-2xl font-bold text-orange-600">
+              {(selectCount?.total_achats ?? 0).toLocaleString()}
+            </div>
           </CardContent>
         </Card>
+
+        {/* Reçus */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Reçus</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{selectCount?.total_achats_recu || 0}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {(selectCount?.total_achats_recu ?? 0).toLocaleString()}
+            </div>
           </CardContent>
         </Card>
+
+        {/* Montant Total */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Montant Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{selectCount?.total_prix_achats.toLocaleString() || 0} Fcfa</div>
+            <div className="text-2xl font-bold">
+              {(selectCount?.total_prix_achats ?? 0).toLocaleString()} Fcfa
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -680,6 +737,7 @@ export function AchatsSection() {
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
+                        onClick={() => handleDownloadFacture(a.id)}
                         variant="outline"
                         size="sm"
                         className="text-primary hover:text-primary-foreground"
@@ -692,9 +750,9 @@ export function AchatsSection() {
                         variant="outline" size="sm">
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button 
-                      onClick={()=> handleDelete(a.id)}
-                      variant="outline" size="sm">
+                      <Button
+                        onClick={() => handleClick(a)}
+                        variant="outline" size="sm">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -705,6 +763,24 @@ export function AchatsSection() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer la commande {achatDelete?.numero_achat} ?
+              Cela supprimera toutes les ventes liées à ce stock !! Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
-}
+} 

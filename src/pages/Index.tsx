@@ -71,9 +71,9 @@ const Index = () => {
       case "fournisseurs":
         return userRole === "admin" ? <FournisseursSection /> : renderDashboard();
       case "achats":
-        return userRole === "admin" ? <AchatsSection /> : renderDashboard();
+        return userRole === "admin" || userRole === "employe" ? <AchatsSection /> : renderDashboard();
       case "stock":
-        return userRole === "admin" ? <StockSection /> : renderDashboard();
+        return userRole === "admin" || userRole === "employe" ? <StockSection /> : renderDashboard();
       case "commissions":
         return userRole === "admin" ? <CommissionsSection /> : renderDashboard();
       case "profile":

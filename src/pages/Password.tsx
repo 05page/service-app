@@ -20,7 +20,7 @@ const CreatePassword = () => {
   
   // Récupérer le token ou l'email depuis l'URL si disponible
 //   const token = searchParams.get("token") || "";
-  const email = searchParams.get("email") || "";
+  const user_id = searchParams.get("user_id") || "";
 
   // Validation du mot de passe
   const passwordRequirements = {
@@ -54,11 +54,11 @@ const CreatePassword = () => {
 
     setLoading(true);
     try {
-      const response = await api.post('/create-password', {
-        email,
+      const response = await api.post('/set-password', {
+        user_id,
         // token,
-        password,
-        confirmPassword
+        password: password,
+        password_confirmation: confirmPassword
       });
 
       toast.success(response.data.message || "Mot de passe créé avec succès !");
@@ -119,10 +119,10 @@ const CreatePassword = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreatePassword} className="space-y-6">
-              {email && (
+              {user_id && (
                 <div className="p-3 bg-accent/50 rounded-lg">
                   <p className="text-sm text-muted-foreground">
-                    Email : <span className="font-medium text-foreground">{email}</span>
+                    Email : <span className="font-medium text-foreground">{user_id}</span>
                   </p>
                 </div>
               )}

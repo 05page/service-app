@@ -1,5 +1,10 @@
+// Import des hooks React pour gérer l'état et les effets
 import { useState, useEffect } from "react";
+
+// Import de l'API configurée pour les appels HTTP
 import api from "../api/api"
+
+// Import des composants UI du projet
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Import des icônes utilisées
 import {
   Plus,
   Search,
@@ -18,101 +25,118 @@ import {
   ShoppingCart,
   RefreshCw
 } from "lucide-react";
+
+// Import pour les notifications toast
 import { toast } from 'sonner';
 
+// Définition d'un type pour les statistiques des ventes
 type Ventes = {
   ventes_en_attente: number;
   total_ventes: number;
-  total_ventes_paye: number;
-  chiffres_affaire_total: number;
-  total_client: number;
+  ventes_paye: number;
+  chiffres_affaire_total: string;
+  total_client?: number; // Pour admin
+  mes_clients?: number; // Pour employé
+  chiffres_affaire_mois: string;
 }
-
+// Composant principal pour la section Ventes
 export function VentesSection() {
+  // États pour les statistiques générales
   const [vente, setVentes] = useState<Ventes | null>(null);
+
+  // États pour la liste des ventes affichées
   const [selectVentes, setSelectVentes] = useState([]);
+
+  // États pour le chargement et l'actualisation
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // État pour l'ouverture du dialog de création de vente
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // États pour le formulaire
-  const [stock, setStock] = useState([]);
-  const [stockId, setStockId] = useState("");
-  const [client, setClient] = useState("");
-  const [numero, setNumero] = useState("");
-  const [adresse, setAdresse] = useState("")
-  const [quantite, setQuantite] = useState("");
-  const [prixUnitaire, setPrixUnitaire] = useState("");
-  const [prixTotal, setPrixTotal] = useState("");
+  // États du formulaire de création de vente
+  const [stock, setStock] = useState([]); // Liste des articles en stock
+  const [stockId, setStockId] = useState(""); // ID de l'article sélectionné
+  const [client, setClient] = useState(""); // Nom du client
+  const [numero, setNumero] = useState(""); // Numéro de téléphone du client
+  const [adresse, setAdresse] = useState(""); // Adresse du client
+  const [quantite, setQuantite] = useState(""); // Quantité vendue
+  const [prixUnitaire, setPrixUnitaire] = useState(""); // Prix unitaire
+  const [prixTotal, setPrixTotal] = useState(""); // Prix total calculé automatiquement
 
+  // Récupère les statistiques de ventes (admin ou employé)
   const fetchVentesStats = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token"); // Récupère le token dans le localStorage
       if (!token) {
         console.error('token non trouvé')
         return
       }
-
       console.log(token)
-      const response = await api.get('/allStats')
-      setVentes(response.data.data)
+      // Déterminer l'endpoint selon le rôle
+      const role = localStorage.getItem("userRole");
+      const endpoint = role === "admin" ? "/allStats" : "/ventes/myStats";
+
+      // Requête pour récupérer les statistiques
+      const response = await api.get(endpoint);
+      setVentes(response.data.data) // Stocke les stats dans l'état
+      console.log(response.data.data)
     } catch (error: any) {
       console.error('Erreur de récupération', error);
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
-        window.location.href = '/auth'
-      } else if (error.response?.status === 403) {
-        toast.error('Accès refusé')
+        window.location.href = '/auth' // Redirige vers l'authentification si token invalide
       } else {
         toast.error('Erreur lors du chargement des données');
       }
     } finally {
-      setLoading(false)
+      setLoading(false) // Fin du chargement
     }
   }
 
+  // Récupère toutes les ventes pour l'affichage
   const selectVente = async () => {
     try {
       const response = await api.get('/ventes/');
       setSelectVentes(response.data.data || [])
-      console.log(response.data.data)
+      console.log("Liste des ventes", response.data.data)
     } catch (error: any) {
       console.error('Erreur survenue lors de la récupération des ventes', error);
-      if (error.response?.status === 403) {
-        toast.error('Accès refusé')
-      } else {
-        toast.error('Erreur lors du chargement des données');
-      }
+      toast.error('Erreur lors du chargement des données');
       setSelectVentes([]);
     } finally {
       setLoading(false)
     }
   }
-
+  // Récupère les stocks disponibles pour le formulaire
   const fetchFormData = async () => {
     try {
-      // Récupérer les stocks disponibles
       const stockResponse = await api.get('/stock/');
       setStock(stockResponse.data.data || []);
-
     } catch (error: any) {
       console.error('Erreur lors du chargement des données du formulaire', error);
       toast.error('Erreur lors du chargement des données');
     }
   }
-
+  // useEffect pour initialiser les données
   useEffect(() => {
     fetchVentesStats()
     selectVente()
     fetchFormData()
   }, [])
+  // Debug: observer les changements d'état
+  useEffect(() => {
+    console.log("État vente mis à jour:", vente);
+  }, [vente]);
 
+  // Calcul automatique du prix total en fonction de la quantité et du prix unitaire
   useEffect(() => {
     const q = parseInt(quantite) || 0;
-    const pU = parseFloat(prixUnitaire) || 0
+    const pU = parseFloat(prixUnitaire) || 0;
     setPrixTotal((q * pU).toFixed(2))
   }, [quantite, prixUnitaire])
 
+  // Actualisation des données
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -128,15 +152,18 @@ export function VentesSection() {
     }
   }
 
+  // Soumission du formulaire de création de vente
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Vérification des champs obligatoires
     if (!stockId || !client || !numero || !adresse || !quantite || !prixUnitaire) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
     try {
+      // Requête POST pour créer la vente
       const response = await api.post('/ventes/', {
         stock_id: parseInt(stockId),
         nom_client: client,
@@ -147,7 +174,7 @@ export function VentesSection() {
 
       toast.success(response.data.message || 'Vente créée avec succès');
 
-      // Réinitialiser le formulaire
+      // Réinitialisation du formulaire
       setStockId("");
       setClient("");
       setNumero("");
@@ -156,7 +183,7 @@ export function VentesSection() {
       setPrixUnitaire("");
       setPrixTotal("");
 
-      // Fermer le dialog et recharger les données
+      // Fermer le dialogue et recharger les données
       setDialogOpen(false);
       fetchVentesStats();
       selectVente();
@@ -168,7 +195,7 @@ export function VentesSection() {
     }
   }
 
-  // Mettre à jour le prix unitaire quand un stock est sélectionné
+  // Met à jour le prix unitaire quand un stock est sélectionné
   useEffect(() => {
     if (stockId) {
       const selectedStock = stock.find((s: any) => s.id === parseInt(stockId));
@@ -178,7 +205,7 @@ export function VentesSection() {
     }
   }, [stockId, stock]);
 
-  //Factures
+  // Téléchargement de la facture PDF pour une vente
   const handleDownloadFacture = async (venteId: string) => {
     try {
       toast.info('Génération de facture en cours...');
@@ -196,7 +223,7 @@ export function VentesSection() {
       document.body.appendChild(link);
       link.click();
 
-      // Nettoyer
+      // Nettoyage de l'objet URL
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
@@ -217,7 +244,7 @@ export function VentesSection() {
     }
 
   }
-
+  // Affichage pendant le chargement
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -233,6 +260,7 @@ export function VentesSection() {
 
   return (
     <div className="space-y-6">
+      {/* Header et boutons d'action */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Ventes</h1>
@@ -241,6 +269,7 @@ export function VentesSection() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* Bouton Actualiser */}
           <Button
             variant="outline"
             onClick={handleRefresh}
@@ -249,6 +278,8 @@ export function VentesSection() {
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
+
+          {/* Bouton + dialogue pour créer une nouvelle vente */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md">
@@ -256,12 +287,16 @@ export function VentesSection() {
                 Nouvelle vente
               </Button>
             </DialogTrigger>
+
+            {/* Contenu du formulaire dans le dialogue */}
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle vente</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit}>
+                {/* Grille pour les champs du formulaire */}
                 <div className="grid grid-cols-2 gap-4 py-4">
+                  {/* Champ Article */}
                   <div className="space-y-2">
                     <Label htmlFor="stock">Article *</Label>
                     {stock && stock.length > 0 ? (
@@ -291,6 +326,7 @@ export function VentesSection() {
                     )}
                   </div>
 
+                  {/* Champ Client */}
                   <div className="space-y-2">
                     <Label htmlFor="client">Client *</Label>
                     <Input
@@ -304,6 +340,7 @@ export function VentesSection() {
                     />
                   </div>
 
+                  {/* Champ Numéro */}
                   <div className="space-y-2">
                     <Label htmlFor="client">Numero *</Label>
                     <Input
@@ -317,6 +354,7 @@ export function VentesSection() {
                     />
                   </div>
 
+                  {/* Champ Adresse */}
                   <div className="space-y-2">
                     <Label htmlFor="client">Adresse *</Label>
                     <Input
@@ -330,6 +368,7 @@ export function VentesSection() {
                     />
                   </div>
 
+                  {/* Champ Quantité */}
                   <div className="space-y-2">
                     <Label htmlFor="quantite">Quantité *</Label>
                     <Input
@@ -343,6 +382,7 @@ export function VentesSection() {
                     />
                   </div>
 
+                  {/* Champ Prix unitaire */}
                   <div className="space-y-2">
                     <Label htmlFor="prixUnitaire">Prix unitaire (FCFA) *</Label>
                     <Input
@@ -361,10 +401,11 @@ export function VentesSection() {
                     </p>
                   </div>
 
+                  {/* Champ Prix total */}
                   <div className="space-y-2">
-                    <Label htmlFor="prixUnitaire">Prix Total (FCFA) *</Label>
+                    <Label htmlFor="prixTotal">Prix Total (FCFA) *</Label>
                     <Input
-                      id="prixUnitaire"
+                      id="prixTotal"
                       type="number"
                       placeholder="Prix total"
                       value={prixTotal}
@@ -379,6 +420,7 @@ export function VentesSection() {
                   </div>
                 </div>
 
+                {/* Boutons annuler et créer */}
                 <div className="flex justify-end space-x-2">
                   <Button
                     type="button"
@@ -403,19 +445,23 @@ export function VentesSection() {
         </div>
       </div>
 
-      {/* Summary cards */}
+      {/* Summary cards (stats) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Total ventes */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total ventes</CardTitle>
             <Euro className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{vente?.chiffres_affaire_total || 0} Fcfa</div>
+            <div className="text-2xl font-bold text-success">
+              {vente?.chiffres_affaire_total ? parseFloat(vente.chiffres_affaire_total).toLocaleString('fr-FR') : 0}
+              Fcfa</div>
             <p className="text-xs text-muted-foreground">Ce mois</p>
           </CardContent>
         </Card>
 
+        {/* Ventes en attente */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">En attente</CardTitle>
@@ -423,10 +469,11 @@ export function VentesSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">{vente?.ventes_en_attente || 0}</div>
-            <p className="text-xs text-muted-foreground">Vente en attente</p>
+            <p className="text-xs text-muted-foreground">Ventes en attente</p>
           </CardContent>
         </Card>
 
+        {/* Total ventes effectuées */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Ventes Effectuées</CardTitle>
@@ -438,19 +485,22 @@ export function VentesSection() {
           </CardContent>
         </Card>
 
+        {/* Total clients */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total client</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{vente?.total_client || 0}</div>
-            <p className="text-xs text-muted-foreground">Client</p>
+            <div className="text-2xl font-bold">
+              {vente?.total_client || vente?.mes_clients || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">Clients</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search and filters */}
+      {/* Section recherche et filtres */}
       <Card className="shadow-[var(--shadow-card)]">
         <CardContent className="pt-6">
           <div className="flex gap-4">
@@ -467,11 +517,12 @@ export function VentesSection() {
         </CardContent>
       </Card>
 
-      {/* Sales list */}
+      {/* Liste des ventes */}
       <div className="grid gap-6">
         {selectVentes && selectVentes.length > 0 ? (
           selectVentes.map((vente: any) => (
             <Card key={vente.id} className="shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
+              {/* Détails de la vente */}
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
@@ -492,6 +543,8 @@ export function VentesSection() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Badge statut */}
                   <Badge
                     variant={
                       vente.statut === "Payé" ? "default" :
@@ -507,6 +560,8 @@ export function VentesSection() {
                   </Badge>
                 </div>
               </CardHeader>
+
+              {/* Contenu de la vente */}
               <CardContent>
                 <div className="space-y-4">
                   {/* Articles */}
@@ -522,7 +577,7 @@ export function VentesSection() {
                     </div>
                   </div>
 
-                  {/* Summary */}
+                  {/* Résumé */}
                   <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
                     <div>
                       <p className="text-sm text-muted-foreground">Total</p>
@@ -530,6 +585,7 @@ export function VentesSection() {
                     </div>
                   </div>
 
+                  {/* Boutons modifier et télécharger */}
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline">Modifier</Button>
                     <Button
@@ -545,6 +601,7 @@ export function VentesSection() {
             </Card>
           ))
         ) : (
+          // Affichage si aucune vente
           <Card className="shadow-[var(--shadow-card)]">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />

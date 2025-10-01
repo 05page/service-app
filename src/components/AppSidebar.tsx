@@ -49,7 +49,9 @@ export function AppSidebar({ activeSection, onSectionChange, userRole }: Sidebar
         ...baseItems,
         { id: "clients", label: "Clients", icon: Users },
         { id: "ventes", label: "Ventes", icon: ShoppingCart },
-        { id: "settings", label: "Paramètres", icon: Settings },
+        { id: "achats", label: "Achats", icon: TrendingUp },
+        { id: "stock", label: "Stock", icon: Package },
+        { id: "profile", label: "Mon Profil", icon: User },
       ];
     }
 
