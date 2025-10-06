@@ -119,13 +119,13 @@ const CreatePassword = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreatePassword} className="space-y-6">
-              {user_id && (
+              {/* {user_id && (
                 <div className="p-3 bg-accent/50 rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     Email : <span className="font-medium text-foreground">{user_id}</span>
                   </p>
                 </div>
-              )}
+              )} */}
 
               <div className="space-y-2">
                 <Label htmlFor="password">Mot de passe</Label>

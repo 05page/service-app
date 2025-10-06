@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import api from '../api/api';
+import DeleteDialog from "./Form/DeleteDialog";
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "../components/Pagination";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +31,6 @@ export function FournisseursSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
 
-  // États
   const [refreshing, setRefreshing] = useState(false);
   const [fournisseur, setFournisseurs] = useState([]);
   const [selectStats, setSelectStats] = useState(null);
@@ -36,8 +38,12 @@ export function FournisseursSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedFournisseur, setSelectedFournisseur] = useState<any>(null);
+  const [fournisseurDelete, setFournisseurDelete] = useState<any | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   // Formulaire
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [nomFournisseurs, setNomFournisseurs] = useState("");
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
@@ -91,7 +97,7 @@ export function FournisseursSection() {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
-
+    setIsSubmitting(true)
     try {
       const response = await api.post('/fournisseurs/', {
         nom_fournisseurs: nomFournisseurs,
@@ -109,6 +115,8 @@ export function FournisseursSection() {
       console.error(error.response?.data);
       const message = error.response?.data?.message || "Erreur survenue lors de l'ajout du fournisseur";
       toast.error(message);
+    } finally {
+      setIsSubmitting(false)
     }
   };
 
@@ -124,14 +132,14 @@ export function FournisseursSection() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedFournisseur) return;
-    
+
     if (!nomFournisseurs || !email || !adresse || !description) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
-
+    setIsSubmitting(true)
     try {
       const response = await api.put(`/fournisseurs/${selectedFournisseur.id}`, {
         nom_fournisseurs: nomFournisseurs,
@@ -146,27 +154,35 @@ export function FournisseursSection() {
       setSelectedFournisseur(null);
       setEditDialogOpen(false);
       getFournisseur();
-      
+
     } catch (error: any) {
       console.error('Erreur mise à jour fournisseur:', error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de la mise à jour du fournisseur";
       toast.error(message);
+    } finally {
+      setIsSubmitting(false)
     }
   };
 
-  const handleDelete = async (fournisseurId: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce fournisseur ?')) {
-      return;
-    }
+  const handleClick = (fs: any) => {
+    setFournisseurDelete(fs)
+    setDeleteDialogOpen(true)
+  }
 
-    try {
-      const response = await api.delete(`/fournisseurs/${fournisseurId}`);
-      toast.success(response.data.message || 'Fournisseur supprimé avec succès');
-      getFournisseur();
-    } catch (error: any) {
-      console.error('Erreur suppression fournisseur:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de la suppression du fournisseur";
-      toast.error(message);
+  const handleDelete = async () => {
+    if (fournisseurDelete) {
+      try {
+        await api.delete(`/fournisseurs/${fournisseurDelete.id}`);
+        await getFournisseur();
+        toast.success(`Fournisseur ${fournisseurDelete.nom_fournisseurs} supprimé avec succès`);
+        setDeleteDialogOpen(false)
+        setFournisseurDelete(null)
+      } catch (error: any) {
+        toast.error("Erreur lors de la suppression");
+        console.error(error.response?.data || error);
+      } finally {
+        setIsDeleting(false)
+      }
     }
   };
 
@@ -178,7 +194,7 @@ export function FournisseursSection() {
     if (!window.confirm(confirmMessage)) {
       return;
     }
-    
+
     try {
       const response = await api.post(`/fournisseurs/${action}/${fournisseurId}`);
       toast.success(response.data.message);
@@ -207,14 +223,22 @@ export function FournisseursSection() {
       f.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       f.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       f.telephone?.includes(searchTerm);
-    
+
     // Correction du filtrage par statut pour correspondre aux valeurs booléennes du serveur
-    const matchesStatut = selectedStatut === "tous" || 
+    const matchesStatut = selectedStatut === "tous" ||
       (selectedStatut === "actif" && f.actif === true) ||
       (selectedStatut === "inactif" && f.actif === false);
-    
+
     return matchesSearch && matchesStatut;
   });
+
+  const {
+    currentPage,
+    totalPages,
+    currentData: currentFournisseur,
+    setCurrentPage
+  } = usePagination({ data: filteredFournisseurs, itemsPerPage: 6 })
+
 
   if (loading) {
     return (
@@ -262,7 +286,7 @@ export function FournisseursSection() {
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="nom">Nom de l'entreprise *</Label>
-                    <Input 
+                    <Input
                       id="nom"
                       value={nomFournisseurs}
                       onChange={(e) => setNomFournisseurs(e.target.value)}
@@ -272,8 +296,8 @@ export function FournisseursSection() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email *</Label>
-                    <Input 
-                      id="email" 
+                    <Input
+                      id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -283,7 +307,7 @@ export function FournisseursSection() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="telephone">Téléphone</Label>
-                    <Input 
+                    <Input
                       id="telephone"
                       value={telephone}
                       onChange={(e) => setTelephone(e.target.value)}
@@ -292,7 +316,7 @@ export function FournisseursSection() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="adresse">Adresse *</Label>
-                    <Input 
+                    <Input
                       id="adresse"
                       value={adresse}
                       onChange={(e) => setAdresse(e.target.value)}
@@ -302,7 +326,7 @@ export function FournisseursSection() {
                   </div>
                   <div className="col-span-2 space-y-2">
                     <Label htmlFor="description">Type de service *</Label>
-                    <Input 
+                    <Input
                       id="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
@@ -312,8 +336,8 @@ export function FournisseursSection() {
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={() => {
                       setDialogOpen(false);
@@ -322,7 +346,16 @@ export function FournisseursSection() {
                   >
                     Annuler
                   </Button>
-                  <Button type="submit">Ajouter</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <span className="flex items-center">
+                        <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                        Ajout...
+                      </span>
+                    ) : (
+                      "Ajouter un fournisseur"
+                    )}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -338,7 +371,7 @@ export function FournisseursSection() {
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-nom">Nom de l'entreprise *</Label>
-                    <Input 
+                    <Input
                       id="edit-nom"
                       value={nomFournisseurs}
                       onChange={(e) => setNomFournisseurs(e.target.value)}
@@ -348,8 +381,8 @@ export function FournisseursSection() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-email">Email *</Label>
-                    <Input 
-                      id="edit-email" 
+                    <Input
+                      id="edit-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -359,7 +392,7 @@ export function FournisseursSection() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-telephone">Téléphone</Label>
-                    <Input 
+                    <Input
                       id="edit-telephone"
                       value={telephone}
                       onChange={(e) => setTelephone(e.target.value)}
@@ -368,7 +401,7 @@ export function FournisseursSection() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-adresse">Adresse *</Label>
-                    <Input 
+                    <Input
                       id="edit-adresse"
                       value={adresse}
                       onChange={(e) => setAdresse(e.target.value)}
@@ -378,7 +411,7 @@ export function FournisseursSection() {
                   </div>
                   <div className="col-span-2 space-y-2">
                     <Label htmlFor="edit-description">Type de service *</Label>
-                    <Input 
+                    <Input
                       id="edit-description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
@@ -388,8 +421,8 @@ export function FournisseursSection() {
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={() => {
                       setEditDialogOpen(false);
@@ -399,7 +432,16 @@ export function FournisseursSection() {
                   >
                     Annuler
                   </Button>
-                  <Button type="submit">Mettre à jour</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <span className="flex items-center">
+                        <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                        Mise à jour...
+                      </span>
+                    ) : (
+                      "Mettre à jour"
+                    )}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -479,89 +521,99 @@ export function FournisseursSection() {
             </TableHeader>
             <TableBody>
               {filteredFournisseurs && filteredFournisseurs.length > 0 ? (
-                filteredFournisseurs.map((f: any) => (
-                  <TableRow key={f.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{f.nom_fournisseurs}</div>
-                        <div className="text-sm text-muted-foreground flex items-center mt-1">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          {f.adresse}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-3 w-3 mr-1" />
-                          {f.email}
-                        </div>
-                        {f.telephone && (
-                          <div className="flex items-center text-sm">
-                            <Phone className="h-3 w-3 mr-1" />
-                            {f.telephone}
+                <>
+                  {currentFournisseur.map((f: any) => (
+                    <TableRow key={f.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{f.nom_fournisseurs}</div>
+                          <div className="text-sm text-muted-foreground flex items-center mt-1">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {f.adresse}
                           </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{f.description}</TableCell>
-                    <TableCell>
-                      <Badge variant={f.actif ? "default" : "secondary"}>
-                        {f.actif ? "Actif" : "Inactif"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-1">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEdit(f)}
-                          title="Modifier"
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDelete(f.id)}
-                          title="Supprimer"
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                        {f.actif ? (
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm">
+                            <Mail className="h-3 w-3 mr-1" />
+                            {f.email}
+                          </div>
+                          {f.telephone && (
+                            <div className="flex items-center text-sm">
+                              <Phone className="h-3 w-3 mr-1" />
+                              {f.telephone}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{f.description}</TableCell>
+                      <TableCell>
+                        <Badge variant={f.actif ? "default" : "secondary"}>
+                          {f.actif ? "Actif" : "Inactif"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-1">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleToggleStatus(f.id, "desactive")}
-                            title="Désactiver"
-                            className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
+                            onClick={() => handleEdit(f)}
+                            title="Modifier"
+                            className="h-8 w-8 p-0"
                           >
-                            <PowerOff className="h-3 w-3" />
+                            <Edit className="h-3 w-3" />
                           </Button>
-                        ) : (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleToggleStatus(f.id, "reactive")}
-                            title="Réactiver"
-                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
+                            onClick={() => handleClick(f)}
+                            title="Supprimer"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
                           >
-                            <Power className="h-3 w-3" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          <DeleteDialog
+                            open={deleteDialogOpen}
+                            openChange={setDeleteDialogOpen}
+                            onConfirm={handleDelete}
+                            itemName={`la commande ${fournisseurDelete?.numero_achat}`}
+                            description="Cela supprimera toutes les actions liés à cet fournisseur. Cette action est irréversible."
+                            isDeleting={isDeleting}
+                          />
+                          {f.actif ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleStatus(f.id, "desactive")}
+                              title="Désactiver"
+                              className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
+                            >
+                              <PowerOff className="h-3 w-3" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleStatus(f.id, "reactive")}
+                              title="Réactiver"
+                              className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
+                            >
+                              <Power className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12">
                     <Building className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
                     <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                      {searchTerm || selectedStatut !== "tous" 
-                        ? 'Aucun fournisseur trouvé' 
+                      {searchTerm || selectedStatut !== "tous"
+                        ? 'Aucun fournisseur trouvé'
                         : 'Aucun fournisseur disponible'
                       }
                     </h3>
@@ -571,18 +623,24 @@ export function FournisseursSection() {
                         : 'Vous n\'avez pas encore de fournisseur. Ajoutez votre premier fournisseur pour commencer.'
                       }
                     </p>
-                    {!searchTerm && selectedStatut === "tous" && (
-                      <Button onClick={() => setDialogOpen(true)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Ajouter mon premier fournisseur
-                      </Button>
-                    )}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
+        {/* Composant de pagination réutilisable */}
+        {currentFournisseur && currentFournisseur.length > 0 && (
+          <div className="mt-4">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredFournisseurs.length}
+              itemsPerPage={6}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
       </Card>
     </div>
   );

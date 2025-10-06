@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from '../api/api';
+import DeleteDialog from "./Form/DeleteDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Search, Edit, Trash2, Phone, Mail, User, Calendar, RefreshCw, Power, PowerOff } from "lucide-react";
+import {
+  Plus, Search, Edit, Trash2, Phone, Mail, User, Calendar, RefreshCw, Power, PowerOff, ChevronLeft,
+  ChevronRight
+} from "lucide-react";
 import { toast } from "sonner";
+import { usePagination } from "../hooks/usePagination";
 
 export function PersonnelSection() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDepartement, setSelectedDepartement] = useState<string>("tous");
 
   const [statsPersonnel, setStatsPersonnel] = useState(null);
   const [personnels, setPersonnels] = useState([]);
@@ -23,12 +27,20 @@ export function PersonnelSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [personnelDelete, setPersonnelDelete] = useState<any | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   // Formulaire
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [fullname, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
+
+  // Dans votre composant
+  const { currentPage, totalPages, currentData, setCurrentPage } =
+    usePagination({ data: personnels, itemsPerPage: 10 });
 
   const getStatsPersonnels = async () => {
     try {
@@ -77,6 +89,7 @@ export function PersonnelSection() {
       return;
     }
 
+    setIsSubmitting(true)
     try {
       const response = await api.post('/admin/createUser', {
         fullname,
@@ -93,6 +106,8 @@ export function PersonnelSection() {
       console.error(error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de l'ajout de l'employé";
       toast.error(message);
+    } finally {
+      setIsSubmitting(false)
     }
   };
 
@@ -107,16 +122,16 @@ export function PersonnelSection() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedEmployee) return;
-    
+
     if (!fullname || !email || !telephone || !adresse) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
-
+    setIsSubmitting(true)
     try {
-      const response = await api.put(`/admin/updateUser/${selectedEmployee.id}`, {
+      const response = await api.put(`/admin/updateEmploye/${selectedEmployee.id}`, {
         fullname,
         email,
         telephone,
@@ -128,43 +143,51 @@ export function PersonnelSection() {
       setSelectedEmployee(null);
       setEditDialogOpen(false);
       getStatsPersonnels();
-      
+
     } catch (error: any) {
       console.error('Erreur mise à jour employé:', error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de la mise à jour de l'employé";
       toast.error(message);
+    } finally {
+      setIsSubmitting(false)
     }
   };
 
-  const handleDelete = async (employeeId: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet employé ?')) {
-      return;
-    }
+  const handleClick = (fs: any) => {
+    setPersonnelDelete(fs)
+    setDeleteDialogOpen(true)
+  }
 
-    try {
-      const response = await api.delete(`/admin/deleteEmploye/${employeeId}`);
-      toast.success(response.data.message || 'Employé supprimé avec succès');
-      getStatsPersonnels();
-    } catch (error: any) {
-      console.error('Erreur suppression employé:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de la suppression de l'employé";
-      toast.error(message);
+  const handleDelete = async () => {
+    if (personnelDelete) {
+      try {
+        await api.delete(`/admin/deleteEmploye/${personnelDelete.id}`);
+        await getStatsPersonnels();
+        toast.success(`Personnel ${personnelDelete.fullname} supprimé avec succès`);
+        setDeleteDialogOpen(false)
+        setPersonnelDelete(null)
+      } catch (error: any) {
+        toast.error("Erreur lors de la suppression");
+        console.error(error.response?.data || error);
+      } finally {
+        setIsDeleting(false)
+      }
     }
   };
 
   const handleToggleStatus = async (employeeId: string, currentStatus: boolean) => {
     const newStatus = !currentStatus;
     const action = newStatus ? 'activer' : 'désactiver';
-    
+
     if (!window.confirm(`Êtes-vous sûr de vouloir ${action} cet employé ?`)) {
       return;
     }
-    
+
     try {
       const response = await api.post(`/admin/toggleUserStatus/${employeeId}`, {
         active: newStatus
       });
-      
+
       toast.success(`Employé ${action} avec succès`);
       getStatsPersonnels();
     } catch (error: any) {
@@ -218,7 +241,7 @@ export function PersonnelSection() {
           <p className="text-muted-foreground">Gérez votre équipe et leurs performances</p>
         </div>
         <div className="flex gap-2">
-          <Button 
+          <Button
             variant="outline"
             onClick={handleRefresh}
             disabled={refreshing}
@@ -241,7 +264,7 @@ export function PersonnelSection() {
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="fullname">Nom complet *</Label>
-                    <Input 
+                    <Input
                       id="fullname"
                       value={fullname}
                       onChange={(e) => setFullName(e.target.value)}
@@ -252,19 +275,19 @@ export function PersonnelSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="email">Email *</Label>
-                    <Input 
-                      id="email" 
+                    <Input
+                      id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="email@entreprise.com"
+                      placeholder="email@employe.com"
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="telephone">Téléphone *</Label>
-                    <Input 
+                    <Input
                       id="telephone"
                       value={telephone}
                       onChange={(e) => setTelephone(e.target.value)}
@@ -275,7 +298,7 @@ export function PersonnelSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="adresse">Adresse *</Label>
-                    <Input 
+                    <Input
                       id="adresse"
                       value={adresse}
                       onChange={(e) => setAdresse(e.target.value)}
@@ -285,9 +308,9 @@ export function PersonnelSection() {
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => {
                       setDialogOpen(false);
                       resetForm();
@@ -295,7 +318,16 @@ export function PersonnelSection() {
                   >
                     Annuler
                   </Button>
-                  <Button type="submit">Ajouter</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <span className="flex items-center">
+                        <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                        Ajout...
+                      </span>
+                    ) : (
+                      "Ajouter un personnel"
+                    )}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -311,7 +343,7 @@ export function PersonnelSection() {
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-fullname">Nom complet *</Label>
-                    <Input 
+                    <Input
                       id="edit-fullname"
                       value={fullname}
                       onChange={(e) => setFullName(e.target.value)}
@@ -322,8 +354,8 @@ export function PersonnelSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="edit-email">Email *</Label>
-                    <Input 
-                      id="edit-email" 
+                    <Input
+                      id="edit-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -334,7 +366,7 @@ export function PersonnelSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="edit-telephone">Téléphone *</Label>
-                    <Input 
+                    <Input
                       id="edit-telephone"
                       value={telephone}
                       onChange={(e) => setTelephone(e.target.value)}
@@ -345,7 +377,7 @@ export function PersonnelSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="edit-adresse">Adresse *</Label>
-                    <Input 
+                    <Input
                       id="edit-adresse"
                       value={adresse}
                       onChange={(e) => setAdresse(e.target.value)}
@@ -355,9 +387,9 @@ export function PersonnelSection() {
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => {
                       setEditDialogOpen(false);
                       setSelectedEmployee(null);
@@ -366,7 +398,17 @@ export function PersonnelSection() {
                   >
                     Annuler
                   </Button>
-                  <Button type="submit">Mettre à jour</Button>
+                  <Button type="submit"
+                    disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <span className="flex items-center">
+                        <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                        Mise à jour...
+                      </span>
+                    ) : (
+                      "Mettre à jour"
+                    )}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -422,18 +464,6 @@ export function PersonnelSection() {
                 />
               </div>
             </div>
-            <Select value={selectedDepartement} onValueChange={setSelectedDepartement}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrer par département" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tous">Tous les départements</SelectItem>
-                <SelectItem value="Ventes">Ventes</SelectItem>
-                <SelectItem value="Marketing">Marketing</SelectItem>
-                <SelectItem value="Technique">Technique</SelectItem>
-                <SelectItem value="Administration">Administration</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <Table>
@@ -483,8 +513,8 @@ export function PersonnelSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-1">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => handleEdit(employe)}
                           title="Modifier"
@@ -492,18 +522,26 @@ export function PersonnelSection() {
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
-                          onClick={() => handleDelete(employe.id)}
+                          onClick={() => handleClick(employe)}
                           title="Supprimer"
                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
+                          <DeleteDialog
+                          open={deleteDialogOpen}
+                          openChange={setDeleteDialogOpen}
+                          onConfirm={handleDelete}
+                          itemName={`la commande ${personnelDelete?.fullname}`}
+                          description="Cela supprimera toutes les actions liés à cet employé. Cette action est irréversible."
+                          isDeleting={isDeleting}
+                        />
                         {employe.active ? (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleToggleStatus(employe.id, employe.active)}
                             title="Désactiver"
@@ -512,8 +550,8 @@ export function PersonnelSection() {
                             <PowerOff className="h-3 w-3" />
                           </Button>
                         ) : (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleToggleStatus(employe.id, employe.active)}
                             title="Activer"
@@ -536,10 +574,6 @@ export function PersonnelSection() {
                     <p className="text-sm text-muted-foreground text-center mb-6">
                       Vous n'avez pas encore d'employé dans votre équipe. Ajoutez votre premier employé pour commencer.
                     </p>
-                    <Button onClick={() => setDialogOpen(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Ajouter mon premier employé
-                    </Button>
                   </TableCell>
                 </TableRow>
               )}

@@ -80,7 +80,7 @@ const ActivateAccount = () => {
                                 <Input
                                     id="code"
                                     type="text"
-                                    placeholder="Entrez le code reçu"
+                                    placeholder="Entrez votre Email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="text-center text-lg tracking-widest font-mono"

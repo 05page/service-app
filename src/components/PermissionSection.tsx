@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,17 +12,18 @@ import {
     Shield,
     Search,
     User,
-    Save,
     Plus,
     RefreshCw,
     Power,
-    PowerOff
+    PowerOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "../components/Pagination";
 
 interface Permission {
     id: string;
-    user_id: string; // CORRECTION: changer employe_id en user_id
+    user_id: string;
     description: string;
     module: string;
     active: boolean;
@@ -43,7 +43,6 @@ interface Employee {
     role: string;
 }
 
-// Modules disponibles selon votre backend
 const availableModules = [
     { value: "fournisseurs", label: "Fournisseurs", description: "Gestion des fournisseurs" },
     { value: "services", label: "Services", description: "Gestion des services" },
@@ -60,8 +59,7 @@ export function PermissionsSection() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
-
-    // États du formulaire
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<string>("");
     const [selectedModule, setSelectedModule] = useState<string>("");
     const [description, setDescription] = useState<string>("");
@@ -76,7 +74,7 @@ export function PermissionsSection() {
 
             const response = await api.get('/admin/showPermissions');
             setPermissions(response.data.data || []);
-            
+
         } catch (error: any) {
             console.error('Erreur récupération permissions:', error);
             if (error.response?.status === 401) {
@@ -117,12 +115,13 @@ export function PermissionsSection() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!selectedEmployee || !selectedModule || !description) {
             toast.error("Veuillez remplir tous les champs obligatoires");
             return;
         }
 
+        setIsSubmitting(true)
         try {
             const response = await api.post('/admin/createPermission', {
                 user_id: parseInt(selectedEmployee),
@@ -134,27 +133,22 @@ export function PermissionsSection() {
             resetForm();
             setDialogOpen(false);
             fetchPermissions();
-            
+
         } catch (error: any) {
             console.error('Erreur création permission:', error.response?.data);
             const message = error.response?.data?.message || "Erreur lors de l'attribution de la permission";
             toast.error(message);
+        } finally {
+            setIsSubmitting(false)
         }
     };
 
     const handleTogglePermission = async (permissionId: string) => {
-        console.log('Toggle permission ID:', permissionId);
-        
         try {
             const response = await api.post(`/admin/permission/${permissionId}`);
-            console.log('Réponse toggle:', response.data);
-            
             toast.success(response.data.message);
-            
-            // Attendre un peu avant de recharger pour s'assurer que le serveur a bien mis à jour
             await new Promise(resolve => setTimeout(resolve, 300));
             await fetchPermissions();
-            
         } catch (error: any) {
             console.error('Erreur toggle permission:', error.response?.data);
             const message = error.response?.data?.message || "Erreur lors du changement de statut";
@@ -173,9 +167,9 @@ export function PermissionsSection() {
         fetchEmployees();
     }, []);
 
-    // Grouper les permissions par employé - CORRECTION
+    // Grouper les permissions par employé
     const groupedPermissions = permissions.reduce((acc, permission) => {
-        const employeeId = permission.user_id; // CORRECTION: utiliser user_id au lieu de employe_id
+        const employeeId = permission.user_id;
         if (!acc[employeeId]) {
             acc[employeeId] = {
                 employee: permission.employe,
@@ -186,22 +180,16 @@ export function PermissionsSection() {
         return acc;
     }, {} as { [key: string]: { employee: any, permissions: Permission[] } });
 
-    // Debug: logs pour vérifier le groupement et les valeurs de active
-    console.log('Permissions brutes:', permissions);
-    console.log('Vérification des statuts active:', permissions.map(p => ({
-        id: p.id,
-        module: p.module,
-        active: p.active,
-        typeOf: typeof p.active
-    })));
-    console.log('Groupement par employé:', groupedPermissions);
-
     // Filtrer par terme de recherche
     const filteredGroupedPermissions = Object.entries(groupedPermissions).filter(([_, data]) => {
         const employee = data.employee;
         return employee.fullname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               employee.email.toLowerCase().includes(searchTerm.toLowerCase());
+            employee.email.toLowerCase().includes(searchTerm.toLowerCase());
     });
+
+    // Pagination
+    const { currentPage, totalPages, currentData: currentPermissions, setCurrentPage } =
+        usePagination({ data: filteredGroupedPermissions, itemsPerPage: 5 });
 
     if (loading) {
         return (
@@ -304,8 +292,8 @@ export function PermissionsSection() {
                                 </div>
 
                                 <div className="flex justify-end gap-2 pt-4">
-                                    <Button 
-                                        type="button" 
+                                    <Button
+                                        type="button"
                                         variant="outline"
                                         onClick={() => {
                                             setDialogOpen(false);
@@ -314,7 +302,16 @@ export function PermissionsSection() {
                                     >
                                         Annuler
                                     </Button>
-                                    <Button type="submit">Attribuer</Button>
+                                    <Button type="submit" disabled={isSubmitting}>
+                                        {isSubmitting ? (
+                                            <span className="flex items-center">
+                                                <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                                                Attribuer...
+                                            </span>
+                                        ) : (
+                                            "Attribuer une permission"
+                                        )}
+                                    </Button>
                                 </div>
                             </form>
                         </DialogContent>
@@ -339,30 +336,27 @@ export function PermissionsSection() {
 
             {/* Permissions list */}
             <div className="grid gap-6">
-                {filteredGroupedPermissions && filteredGroupedPermissions.length > 0 ? (
-                    filteredGroupedPermissions.map(([employeeId, data]) => (
-                        <Card key={employeeId} className="shadow-[var(--shadow-card)]">
-                            <CardHeader>
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                                            <User className="h-6 w-6 text-primary" />
-                                        </div>
-                                        <div>
-                                            <CardTitle className="text-lg">{data.employee.fullname}</CardTitle>
-                                            <p className="text-sm text-muted-foreground">{data.employee.email}</p>
-                                            <Badge variant="outline" className="mt-1">{data.employee.role}</Badge>
+                {currentPermissions && currentPermissions.length > 0 ? (
+                    <>
+                        {currentPermissions.map(([employeeId, data]) => (
+                            <Card key={employeeId} className="shadow-[var(--shadow-card)]">
+                                <CardHeader>
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                                <User className="h-6 w-6 text-primary" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-lg">{data.employee.fullname}</CardTitle>
+                                                <p className="text-sm text-muted-foreground">{data.employee.email}</p>
+                                                <Badge variant="outline" className="mt-1">{data.employee.role}</Badge>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {data.permissions.map((permission) => {
-                                        // Debug: log pour chaque permission affichée
-                                        console.log(`Permission ${permission.id} - Module: ${permission.module} - Active:`, permission.active, typeof permission.active);
-                                        
-                                        return (
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {data.permissions.map((permission) => (
                                             <div
                                                 key={permission.id}
                                                 className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
@@ -390,33 +384,41 @@ export function PermissionsSection() {
                                                         size="sm"
                                                         onClick={() => handleTogglePermission(permission.id)}
                                                         title={permission.active ? "Désactiver" : "Activer"}
-                                                        className={`h-8 w-8 p-0 ${
-                                                            permission.active 
-                                                                ? 'text-orange-600 hover:text-orange-700 hover:border-orange-300'
-                                                                : 'text-green-600 hover:text-green-700 hover:border-green-300'
-                                                        }`}
+                                                        className={`h-8 w-8 p-0 ${permission.active
+                                                            ? 'text-orange-600 hover:text-orange-700 hover:border-orange-300'
+                                                            : 'text-green-600 hover:text-green-700 hover:border-green-300'
+                                                            }`}
                                                     >
-                                                        {permission.active ? 
-                                                            <PowerOff className="h-3 w-3" /> : 
+                                                        {permission.active ?
+                                                            <PowerOff className="h-3 w-3" /> :
                                                             <Power className="h-3 w-3" />
                                                         }
                                                     </Button>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        ))}
 
-                                    {/* Summary */}
-                                    <div className="pt-4 border-t">
-                                        <p className="text-sm text-muted-foreground">
-                                            Permissions totales: {data.permissions.length} | 
-                                            Actives: {data.permissions.filter(p => p.active).length}
-                                        </p>
+                                        <div className="pt-4 border-t">
+                                            <p className="text-sm text-muted-foreground">
+                                                Permissions totales: {data.permissions.length} |
+                                                Actives: {data.permissions.filter(p => p.active).length}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))
+                                </CardContent>
+                            </Card>
+                        ))}
+
+                        {/* Pagination */}
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={filteredGroupedPermissions.length}
+                            itemsPerPage={5}
+                            onPageChange={setCurrentPage}
+                            className="mt-4"
+                        />
+                    </>
                 ) : (
                     <Card className="shadow-[var(--shadow-card)]">
                         <CardContent className="flex flex-col items-center justify-center py-12">
@@ -425,17 +427,11 @@ export function PermissionsSection() {
                                 {searchTerm ? 'Aucune permission trouvée' : 'Aucune permission attribuée'}
                             </h3>
                             <p className="text-sm text-muted-foreground text-center mb-6">
-                                {searchTerm 
+                                {searchTerm
                                     ? `Aucune permission ne correspond à votre recherche "${searchTerm}"`
                                     : 'Aucune permission n\'a encore été attribuée. Commencez par attribuer des permissions à vos employés.'
                                 }
                             </p>
-                            {!searchTerm && (
-                                <Button onClick={() => setDialogOpen(true)}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Attribuer ma première permission
-                                </Button>
-                            )}
                         </CardContent>
                     </Card>
                 )}

@@ -1,735 +1,232 @@
-import api from '../api/api';
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign, RefreshCw, FileText } from "lucide-react";
-import { toast } from 'sonner';
+import { Card } from "@/components/ui/card";
+import { ArrowRight, Users, ShoppingCart, Package, Shield, Sparkles, Zap, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
 
-
-interface Achat {
-  id: string;
-  numeroCommande: string;
-  fournisseur: string;
-  service: string;
-  quantite: number;
-  prixUnitaire: number;
-  montantTotal: number;
-  statut: "en_attente" | "confirme" | "recu" | "annule";
-  dateCommande: string;
-  dateLivraison?: string;
-  description: string;
-}
-
-type Achats = {
-  total_achat_commande: number,
-  total_achats: number,
-  total_achats_recu: number,
-  total_prix_achats: number
-}
-
-export function AchatsSection() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStatut, setSelectedStatut] = useState<string>("tous");
-  const [selectedPeriode, setSelectedPeriode] = useState<string>("ce_mois");
-
-  const [refreshing, setRefreshing] = useState(false)
-  const [achat, setchAchat] = useState([]);
-  const [fournisseur, setFournisseur] = useState<any[]>([]);
-  const [selectCount, setSelectCount] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectAchat, setSelectAchat] = useState<any>(null);
-
-  const [fournisseurId, setFournisseurId] = useState("");
-  const [typeService, setTypeService] = useState("");
-  const [quantite, setQuantite] = useState("");
-  const [prixUnitaire, setPrixUnitaire] = useState("")
-  const [dateCommande, setDateCommande] = useState("");
-  const [dateLivraison, setDateLivraison] = useState("");
-  const [statut, setStatut] = useState("");
-  const [description, setDescription] = useState("");
-
-
-  const fecthAchats = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        console.error('token non trouvé');
-      }
-      console.log(token);
-
-      //Réupération des stats
-      const role = localStorage.getItem("userRole");
-      const endpoint = role === "admin" ? "/allStats" : "/achat/stats";
-      const response = await api.get(endpoint);
-      setSelectCount(response.data.data);
-
-      //Récupération des fournisseurs 
-      const res = await api.get('/fournisseurs')
-      console.log('Réponse API fournisseurs:', res.data.data);
-      if (res.data.success && res.data.data) {
-        console.log('Nombre de fournisseurs trouvés:', res.data.data.length);
-        setFournisseur(res.data.data);
-      } else {
-        console.warn('Aucun fournisseur trouvé');
-        setFournisseur([]);
-      }
-    } catch (error: any) {
-      console.error('Erreur de récupération', error);
-
-      if (error.response) {
-        // ✅ Erreur renvoyée par le backend
-        console.error("Status:", error.response.status);
-        console.error("Data:", error.response.data);
-        console.error("Headers:", error.response.headers);
-
-        if (error.response.status === 401) {
-          console.error('Token invalide ou expiré. Veuillez vous reconnecter');
-          window.location.href = '/auth';
-        } else {
-          console.error('Erreur API:', error.response.data.message || 'Erreur inconnue');
-        }
-
-      } else if (error.request) {
-        // ✅ Requête envoyée mais pas de réponse (timeout, serveur down, CORS…)
-        console.error("Pas de réponse du serveur:", error.request);
-
-      } else {
-        // ✅ Erreur côté front (bug JS, mauvaise config axios…)
-        console.error("Erreur front:", error.message);
-      }
-
-      setFournisseur([]);
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const getAchats = async () => {
-    try {
-      const response = await api.get('/achat/');
-      setchAchat(response.data.data)
-    } catch (error) {
-      console.error('Erreur survenue lors de la récupération des achats', error);
-      setchAchat([]);
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await fecthAchats();
-      await getAchats();
-      toast.success('Données actualisées')
-    } catch (error) {
-      toast.error('Erreur lors de l\'actualisation');
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fournisseurId || !typeService || !quantite || !prixUnitaire || !dateCommande || !statut) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-    try {
-      const response = await api.post('/achat/', {
-        fournisseur_id: fournisseurId,
-        nom_service: typeService,
-        quantite: parseInt(quantite),
-        prix_unitaire: parseFloat(prixUnitaire),
-        date_commande: dateCommande,
-        date_livraison: dateLivraison || null,
-        statut,
-        description
-      });
-
-      toast(response.data.message || 'Achat créé avec succès');
-      setFournisseurId("");
-      setTypeService("");
-      setQuantite("");
-      setPrixUnitaire("")
-      setDateCommande("");
-      setDateLivraison("");
-      setStatut("");
-      setDescription("");
-
-      setDialogOpen(false)
-      getAchats();
-      fecthAchats();
-    } catch (error: any) {
-      console.error('Erreur création achat:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de l'ajout de l'achat";
-      toast.error(message);
-    }
-  }
-
-  const handleEdit = (upAchat: any) => {
-    setSelectAchat(upAchat);
-    setFournisseurId(upAchat.fournisseur_id?.toString() || "");
-    setTypeService(upAchat.nom_service || "");
-    setQuantite(upAchat.quantite?.toString() || "");
-    setPrixUnitaire(upAchat.prix_unitaire?.toString() || "");
-    setDateCommande(upAchat.date_commande || "");
-    setDateLivraison(upAchat.date_livraison || "");
-    setStatut(upAchat.statut || "");
-    setDescription(upAchat.description || "");
-    setEditDialogOpen(true);
-  };
-
-
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectAchat) return;
-    if (!fournisseurId || !typeService || !quantite || !prixUnitaire || !dateCommande || !statut) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-
-    try {
-      const response = await api.put(`/achat/${selectAchat.id}`, {
-        fournisseur_id: fournisseurId,
-        nom_service: typeService,
-        quantite: parseInt(quantite),
-        prix_unitaire: parseFloat(prixUnitaire),
-        date_commande: dateCommande,
-        date_livraison: dateLivraison || null,
-        statut,
-        description
-      });
-      toast.success(response.data.message || 'Achat mis à jour');
-      setSelectAchat(null)
-      setEditDialogOpen(false);
-      getAchats();
-      fecthAchats();
-    } catch (error: any) {
-      console.error(error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de mise à jour de l'achat";
-      toast.error(message);
-    }
-  }
-
-  const handleDelete = async (achatId: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet achat ?')) {
-      return;
-    }
-    try {
-      const response = await api.delete(`/achat/${achatId}`);
-      toast.success(response.data.message || 'Achat supprimé avec succès');
-      getAchats();
-      fecthAchats();
-    } catch (error: any) {
-      console.error('Erreur suppression achat:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de la suppression de l'achat";
-      toast.error(message);
-    }
-  }
-  useEffect(() => {
-    fecthAchats();
-    getAchats();
-  }, []);
-
-  const getStatutColor = (statut: string) => {
-    switch (statut) {
-      case "en attente":
-        return "secondary";
-      case "reçu":
-        return "default";
-      case "annule":
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
-
-  const getStatutLabel = (statut: string) => {
-    switch (statut) {
-      case "en  attente":
-        return "En attente";
-      case "confirme":
-        return "Confirmé";
-      case "recu":
-        return "Reçu";
-      case "annule":
-        return "Annulé";
-      default:
-        return statut;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-            <p className="text-muted-foreground">Chargement des achats...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
+const Landing = () => {
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Achats</h1>
-          <p className="text-muted-foreground">Gérez vos commandes et achats de services</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Actualiser
-          </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nouvelle Commande
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Créer une nouvelle commande</DialogTitle>
-              </DialogHeader>
-
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fournisseur">Fournisseur *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
-                      <Select value={fournisseurId} onValueChange={setFournisseurId} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un fournisseur" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseur?.map((f: any) => (
-                            <SelectItem key={f.id} value={f.id.toString()}>
-                              {f.nom_fournisseurs}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className='text-sm text-red-500'>
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="service">Service *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
-                      <Select value={typeService} onValueChange={setTypeService} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="nom du service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseur.map((f: any) => (
-                            <SelectItem key={f.id} value={f.description}>
-                              {f.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className="text-sm text-red-500">
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord.
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="quantite">Quantité *</Label>
-                    <Input id="quantite"
-                      value={quantite} onChange={(e) => setQuantite(e.target.value)}
-                      type="number" min="1" placeholder="1" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="prix">Prix unitaire (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" placeholder="1000" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="prix">Prix total (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" placeholder="1000" disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de commande *</Label>
-                    <Input id="livraison"
-                      value={dateCommande} onChange={(e) => setDateCommande(e.target.value)}
-                      type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de livraison</Label>
-                    <Input id="livraison"
-                      value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)}
-                      type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="statut">Statut *</Label>
-                    <Select value={statut} onValueChange={setStatut} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un statut" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="commande">Commande</SelectItem>
-                        <SelectItem value="paye">Payé</SelectItem>
-                        <SelectItem value="reçu">Reçu</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Description détaillée du service" />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type='button' variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                  <Button type='submit'>Créer la commande</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {/* edit */}
-          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DialogTrigger asChild>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Modifier</DialogTitle>
-              </DialogHeader>
-
-              <form onSubmit={handleUpdate}>
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fournisseur">Fournisseur *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
-                      <Select value={fournisseurId} onValueChange={setFournisseurId} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un fournisseur" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseur?.map((f: any) => (
-                            <SelectItem key={f.id} value={f.id.toString()}>
-                              {f.nom_fournisseurs}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className='text-sm text-red-500'>
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="service">Service *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
-                      <Select value={typeService} onValueChange={setTypeService} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="nom du service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseur.map((f: any) => (
-                            <SelectItem key={f.id} value={f.description}>
-                              {f.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className="text-sm text-red-500">
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord.
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="quantite">Quantité *</Label>
-                    <Input id="quantite"
-                      value={quantite} onChange={(e) => setQuantite(e.target.value)}
-                      type="number" min="1" placeholder="1" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="prix">Prix unitaire (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" placeholder="1000" />
-                  </div>
-
-                  {/* <div className="space-y-2">
-                    <Label htmlFor="prix">Prix total (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" placeholder="1000" disabled />
-                  </div> */}
-                  <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de commande *</Label>
-                    <Input id="livraison"
-                      value={dateCommande} onChange={(e) => setDateCommande(e.target.value)}
-                      type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de livraison</Label>
-                    <Input id="livraison"
-                      value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)}
-                      type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="statut">Statut *</Label>
-                    <Select value={statut} onValueChange={setStatut} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un statut" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="commande">Commande</SelectItem>
-                        <SelectItem value="paye">Payé</SelectItem>
-                        <SelectItem value="reçu">Reçu</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Description détaillée du service" />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type='button' variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                  <Button type='submit'>Modifier la commande</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 overflow-hidden">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
 
-      {/* Statistiques */}
-      <div className="grid gap-4 md:grid-cols-4">
-        {/* Total Commandes */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Commandes</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {(selectCount?.total_achat_commande ?? 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Header */}
+      <header className="relative border-b bg-background/80 backdrop-blur-md animate-fade-in">
 
-        {/* Total Achat */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Achat</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {(selectCount?.total_achats ?? 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Reçus */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reçus</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {(selectCount?.total_achats_recu ?? 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Montant Total */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Montant Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {(selectCount?.total_prix_achats ?? 0).toLocaleString()} Fcfa
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filtres et recherche */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Liste des achats</CardTitle>
-          <CardDescription>Suivez vos commandes et leur statut</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Rechercher par numéro, fournisseur ou service..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+                <ShoppingCart className="h-5 w-5 text-primary-foreground" />
               </div>
+              <h1 className="text-xl font-bold text-foreground">CommercePro</h1>
             </div>
-            <Select value={selectedStatut} onValueChange={setSelectedStatut}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrer par statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tous">Tous les statuts</SelectItem>
-                <SelectItem value="en_attente">En attente</SelectItem>
-                <SelectItem value="confirme">Confirmé</SelectItem>
-                <SelectItem value="recu">Reçu</SelectItem>
-                <SelectItem value="annule">Annulé</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedPeriode} onValueChange={setSelectedPeriode}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Période" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ce_mois">Ce mois</SelectItem>
-                <SelectItem value="mois_dernier">Mois dernier</SelectItem>
-                <SelectItem value="trimestre">Ce trimestre</SelectItem>
-                <SelectItem value="annee">Cette année</SelectItem>
-              </SelectContent>
-            </Select>
+            <Link to="/auth">
+              <Button variant="outline" className="gap-2">
+                Se connecter
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="relative py-32">
+        <div className="container mx-auto px-6 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8 animate-fade-in">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Nouveau : Gestion de stock intelligente</span>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Commande</TableHead>
-                <TableHead>Fournisseur</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Quantité</TableHead>
-                <TableHead>Prix unitaire</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Livraison</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {achat.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{a.numero_achat}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {new Date(a.created_at).toLocaleString()}
-                      </div>
+          <h2 className="text-5xl md:text-7xl font-bold text-foreground mb-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            Gérez votre activité commerciale
+            <span className="block mt-2 bg-gradient-to-r from-primary via-primary/80 to-secondary bg-clip-text text-transparent">
+              en toute simplicité
+            </span>
+          </h2>
+
+          <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '0.4s' }}>
+            Plateforme complète pour acheter, revendre et gérer vos services avec un système de gestion de stock avancé.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
+            <Link to="/auth">
+              <Button size="lg" className="gap-2 px-8 py-6 text-lg group relative overflow-hidden">
+                <span className="relative z-10 flex items-center gap-2">
+                  Accéder à l'application
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </Button>
+            </Link>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-8 max-w-3xl mx-auto mt-20 animate-fade-in" style={{ animationDelay: '0.8s' }}>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-foreground mb-2">500+</div>
+              <div className="text-sm text-muted-foreground">Entreprises</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-foreground mb-2">98%</div>
+              <div className="text-sm text-muted-foreground">Satisfaction</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-foreground mb-2">24/7</div>
+              <div className="text-sm text-muted-foreground">Support</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="relative py-20 bg-muted/30">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16 animate-fade-in">
+            <h3 className="text-4xl font-bold mb-4 text-foreground">
+              Une solution complète pour votre business
+            </h3>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Tous les outils dont vous avez besoin pour gérer votre commerce efficacement
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: Users,
+                title: "Gestion clients",
+                description: "Gérez vos clients, intermédiaires et employés facilement",
+                delay: "0s",
+                gradient: "from-blue-500/10 to-blue-600/10"
+              },
+              {
+                icon: ShoppingCart,
+                title: "Achats & Ventes",
+                description: "Suivez vos achats chez les fournisseurs et vos ventes clients",
+                delay: "0.1s",
+                gradient: "from-purple-500/10 to-purple-600/10"
+              },
+              {
+                icon: Package,
+                title: "Gestion de stock",
+                description: "Gérez votre inventaire et suivez vos stocks en temps réel",
+                delay: "0.2s",
+                gradient: "from-green-500/10 to-green-600/10"
+              },
+              {
+                icon: Shield,
+                title: "Sécurisé",
+                description: "Accès sécurisé avec différents niveaux de permissions",
+                delay: "0.3s",
+                gradient: "from-orange-500/10 to-orange-600/10"
+              }
+            ].map((feature, index) => (
+              <Card
+                key={index}
+                className="group p-6 border-border bg-card hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 animate-fade-in cursor-pointer relative overflow-hidden"
+                style={{ animationDelay: feature.delay }}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                <div className="relative">
+                  <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500">
+                    <feature.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <h4 className="font-semibold mb-2 text-card-foreground text-lg">{feature.title}</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="relative py-20">
+        <div className="container mx-auto px-6">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6 animate-fade-in">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium text-primary">Performance optimale</span>
+              </div>
+              <h3 className="text-4xl font-bold text-foreground">
+                Augmentez votre productivité de 300%
+              </h3>
+              <p className="text-lg text-muted-foreground">
+                Automatisez vos processus de gestion et concentrez-vous sur la croissance de votre entreprise.
+              </p>
+              <ul className="space-y-4">
+                {[
+                  "Tableau de bord intuitif en temps réel",
+                  "Rapports automatiques détaillés",
+                  "Notifications intelligentes",
+                  "Multi-utilisateurs avec permissions"
+                ].map((item, index) => (
+                  <li key={index} className="flex items-center gap-3 text-foreground">
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <div className="h-2 w-2 rounded-full bg-primary"></div>
                     </div>
-                  </TableCell>
-                  <TableCell>{a.fournisseur?.nom_fournisseurs}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{a.nom_service}</div>
-                      <div className="text-sm text-muted-foreground max-w-xs truncate">
-                        {a.description}
-                      </div>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="relative animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              <div className="aspect-square rounded-2xl bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 p-8 backdrop-blur-sm border border-primary/10">
+                <div className="w-full h-full rounded-xl bg-card/50 backdrop-blur-sm flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
+                      99.9%
                     </div>
-                  </TableCell>
-                  <TableCell>{a.quantite}</TableCell>
-                  <TableCell>{a.prix_unitaire} Fcfa</TableCell>
-                  <TableCell className="font-medium">{a.prix_total} Fcfa</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatutColor(a.statut)}>
-                      {getStatutLabel(a.statut)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {a.date_livraison ?
-                      new Date(a.date_livraison).toLocaleDateString('fr-FR') :
-                      <span className="text-muted-foreground">Non définie</span>
-                    }
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-primary hover:text-primary-foreground"
-                        title='Générer la facture fournisseur'
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        onClick={() => handleEdit(a)}
-                        variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(a.id)}
-                        variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    <div className="text-xl text-muted-foreground">Disponibilité</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="relative py-20">
+        <div className="container mx-auto px-6">
+          <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5 animate-fade-in">
+            <div className="absolute inset-0 bg-grid-white/5 [mask-image:radial-gradient(white,transparent_70%)]"></div>
+            <div className="relative p-12 text-center">
+              <h3 className="text-4xl font-bold mb-6 text-foreground">
+                Prêt à démarrer ?
+              </h3>
+              <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                Rejoignez des centaines d'entreprises qui font confiance à CommercePro
+              </p>
+              <Link to="/auth">
+                <Button size="lg" className="gap-2 px-8 py-6 text-lg group hover-scale">
+                  Commencer maintenant
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative border-t bg-background/80 backdrop-blur-md">y
+        <div className="container mx-auto px-6 py-8">
+          <div className="text-center text-muted-foreground">
+            <p>&copy; 2024 CommercePro. Plateforme de gestion commerciale.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
-}
+};
+
+export default Landing;

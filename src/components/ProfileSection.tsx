@@ -42,7 +42,8 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
     const [profileUser, setProfileUser] = useState<UserProfile | null>(null);
     const [isEditing, setIsEditing] = useState(false)
     const [refreshing, setRefreshing] = useState(false)
-    
+    const [isSubmitting, setIsSubmitting] = useState(false)
+
     // États pour le changement de mot de passe
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [passwordData, setPasswordData] = useState({
@@ -100,6 +101,7 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
 
     const handleSave = async () => {
         if (!profileUser) return;
+        setIsSubmitting(true);
         try {
             const response = await api.put('/update/', {
                 fullname: profileUser.fullname,
@@ -118,6 +120,8 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
         } catch (error) {
             console.error("Erreur lors de la sauvegarde :", error);
             toast.error(error.response?.data?.message)
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -139,12 +143,13 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
         }
 
         setPasswordLoading(true);
+        setIsSubmitting(true);
         try {
             const response = await api.post('/password/reset', passwordData);
 
             if (response.data.success) {
                 toast.success(response.data.message || 'Mot de passe modifié avec succès');
-                
+
                 // Réinitialiser le formulaire
                 setPasswordData({
                     current_password: '',
@@ -155,7 +160,7 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
             }
         } catch (error) {
             console.error('Erreur lors du changement de mot de passe:', error);
-            
+
             if (error.response?.data?.errors) {
                 // Afficher les erreurs de validation
                 const errors = error.response.data.errors;
@@ -167,6 +172,7 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
             }
         } finally {
             setPasswordLoading(false);
+            setIsSubmitting(false)
         }
     };
 
@@ -455,9 +461,19 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
                                     onClick={() => {
                                         handleSave()
                                     }}
+                                    disabled={isSubmitting}
                                 >
-                                    <Save className="h-4 w-4 mr-2" />
-                                    Enregistrer
+                                    {isSubmitting ? (
+                                        <span className="flex items-center">
+                                            <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                                            Mise à jour...
+                                        </span>
+                                    ):(    
+                                    <>
+                                        <Save className="h-4 w-4 mr-2" />
+                                        Enregistrer
+                                    </>
+                                    )}
                                 </Button>
                             </div>
                         </div>

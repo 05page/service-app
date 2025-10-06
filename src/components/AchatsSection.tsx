@@ -1,18 +1,19 @@
 import api from '../api/api';
+import DeleteDialog from './Form/DeleteDialog';
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign, RefreshCw, FileText } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign, RefreshCw, FileText, ShieldAlert } from "lucide-react";
 import { toast } from 'sonner';
-import { parse } from 'date-fns';
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "../components/Pagination";
 
 type Achats = {
   total_achat_commande: number,
@@ -25,7 +26,9 @@ export function AchatsSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
   const [selectedPeriode, setSelectedPeriode] = useState<string>("ce_mois");
+  const [accessDenied, setAccessDenied] = useState(false);
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [achat, setchAchat] = useState([]);
   const [fournisseur, setFournisseur] = useState<any[]>([]);
@@ -44,10 +47,9 @@ export function AchatsSection() {
   const [dateLivraison, setDateLivraison] = useState("");
   const [statut, setStatut] = useState("");
   const [description, setDescription] = useState("");
-
-  //Delete
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [achatDelete, setAchatDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fecthAchats = async () => {
     try {
@@ -56,7 +58,6 @@ export function AchatsSection() {
         console.error('token non trouvé');
       }
       console.log(token);
-
       //Réupération des stats
       const role = localStorage.getItem("userRole");
       const endpoint = role === "admin" ? "/allStats" : "/achat/stats";
@@ -75,29 +76,14 @@ export function AchatsSection() {
       }
     } catch (error: any) {
       console.error('Erreur de récupération', error);
-
       if (error.response) {
-        // ✅ Erreur renvoyée par le backend
-        console.error("Status:", error.response.status);
-        console.error("Data:", error.response.data);
-        console.error("Headers:", error.response.headers);
-
         if (error.response.status === 401) {
           console.error('Token invalide ou expiré. Veuillez vous reconnecter');
           window.location.href = '/auth';
         } else {
           console.error('Erreur API:', error.response.data.message || 'Erreur inconnue');
         }
-
-      } else if (error.request) {
-        // ✅ Requête envoyée mais pas de réponse (timeout, serveur down, CORS…)
-        console.error("Pas de réponse du serveur:", error.request);
-
-      } else {
-        // ✅ Erreur côté front (bug JS, mauvaise config axios…)
-        console.error("Erreur front:", error.message);
       }
-
       setFournisseur([]);
     } finally {
       setLoading(false)
@@ -108,8 +94,14 @@ export function AchatsSection() {
     try {
       const response = await api.get('/achat/');
       setchAchat(response.data.data)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur survenue lors de la récupération des achats', error);
+      if (error.response?.status === 403) {
+        setAccessDenied(true); // Active l'affichage d'accès refusé
+        toast.error('Accès refusé. Vous n\'avez pas les permissions nécessaires');
+      } else {
+        console.error('Erreur lors du chargement des données');
+      }
       setchAchat([]);
     } finally {
       setLoading(false)
@@ -135,6 +127,7 @@ export function AchatsSection() {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
+    setIsSubmitting(true)
     try {
       const response = await api.post('/achat/', {
         fournisseur_id: fournisseurId,
@@ -146,7 +139,6 @@ export function AchatsSection() {
         statut,
         description
       });
-
       toast(response.data.message || 'Achat créé avec succès');
       setFournisseurId("");
       setTypeService("");
@@ -156,7 +148,6 @@ export function AchatsSection() {
       setDateLivraison("");
       setStatut("");
       setDescription("");
-
       setDialogOpen(false)
       getAchats();
       fecthAchats();
@@ -164,6 +155,8 @@ export function AchatsSection() {
       console.error('Erreur création achat:', error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de l'ajout de l'achat";
       toast.error(message);
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -180,7 +173,6 @@ export function AchatsSection() {
     setEditDialogOpen(true);
   };
 
-
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectAchat) return;
@@ -188,7 +180,7 @@ export function AchatsSection() {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
-
+    setIsSubmitting(true)
     try {
       const response = await api.put(`/achat/${selectAchat.id}`, {
         fournisseur_id: fournisseurId,
@@ -209,6 +201,8 @@ export function AchatsSection() {
       console.error(error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de mise à jour de l'achat";
       toast.error(message);
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -221,12 +215,15 @@ export function AchatsSection() {
     if (achatDelete) {
       try {
         await api.delete(`/achat/${achatDelete.id}`);
-        await fecthAchats();
-        await getAchats();
-        toast.success(`Achat${achatDelete?.numero_achat} supprimer avec succès`);
+        await Promise.all([fecthAchats(), getAchats()]);
+        toast.success(`Achat ${achatDelete?.numero_achat} supprimé avec succès`);
+        setDeleteDialogOpen(false);
+        setAchatDelete(null);
       } catch (error: any) {
         toast.error("Erreur lors de la suppression");
         console.error(error.response?.data || error);
+      } finally {
+        setIsDeleting(false);
       }
     }
   }
@@ -246,10 +243,8 @@ export function AchatsSection() {
       link.download = `facture-${achatId}.pdf`;
       document.body.appendChild(link);
       link.click();
-
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url)
-
       toast.success("Facture téléchargée avec succès")
     } catch (error: any) {
       if (error.response?.data instanceof Blob) {
@@ -281,7 +276,7 @@ export function AchatsSection() {
     getAchats();
   }, []);
 
-  useEffect(()=>{
+  useEffect(() => {
     const q = parseInt(quantite) || 0;
     const pU = parseFloat(prixUnitaire) || 0;
     setPrixTotal((q * pU).toFixed(2))
@@ -289,31 +284,59 @@ export function AchatsSection() {
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
-      case "en attente":
-        return "secondary";
-      case "reçu":
-        return "default";
-      case "annule":
-        return "destructive";
-      default:
-        return "secondary";
+      case "commande": return "secondary";
+      case "paye": return "default";
+      case "reçu": return "default";
+      case "annule": return "destructive";
+      default: return "secondary";
     }
   };
 
   const getStatutLabel = (statut: string) => {
     switch (statut) {
-      case "en  attente":
-        return "En attente";
-      case "confirme":
-        return "Confirmé";
-      case "recu":
-        return "Reçu";
-      case "annule":
-        return "Annulé";
-      default:
-        return statut;
+      case "commande": return "Commande";
+      case "paye": return "Payé";
+      case "reçu": return "Reçu";
+      case "annule": return "Annulé";
+      default: return statut;
     }
   };
+
+  const filteredAchats = achat.filter((a: any) => {
+    const matchSearch = searchTerm === "" ||
+      a.numero_achat?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.fournisseur?.nom_fournisseurs?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.nom_service?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatut = selectedStatut === "tous" || a.statut === selectedStatut;
+    let matchPeriode = true;
+    if (selectedPeriode !== "tous") {
+      const achatDate = new Date(a.created_at);
+      const now = new Date();
+      switch (selectedPeriode) {
+        case "ce_mois":
+          matchPeriode = achatDate.getMonth() === now.getMonth() &&
+            achatDate.getFullYear() === now.getFullYear();
+          break;
+        case "mois_dernier":
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          matchPeriode = achatDate.getMonth() === lastMonth.getMonth() &&
+            achatDate.getFullYear() === lastMonth.getFullYear();
+          break;
+        case "trimestre":
+          const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          matchPeriode = achatDate >= threeMonthsAgo;
+          break;
+        case "annee":
+          matchPeriode = achatDate.getFullYear() === now.getFullYear();
+          break;
+      }
+    }
+    return matchSearch && matchStatut && matchPeriode;
+  });
+
+  // Utilisation du hook de pagination sur les clients filtrés
+  const { currentPage, totalPages, currentData: currentAchats, setCurrentPage } =
+    usePagination({ data: filteredAchats, itemsPerPage: 6 });
 
   if (loading) {
     return (
@@ -322,6 +345,22 @@ export function AchatsSection() {
           <CardContent className="flex flex-col items-center justify-center p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
             <p className="text-muted-foreground">Chargement des achats...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  // Affichage en cas d'accès refusé (erreur 403)
+  if (accessDenied) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8 text-center">
+            <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Accès refusé</h2>
+            <p className="text-muted-foreground">
+              Vous n'avez pas la permission d'accéder à la gestion des achats.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -336,11 +375,7 @@ export function AchatsSection() {
           <p className="text-muted-foreground">Gérez vos commandes et achats de services</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
@@ -355,88 +390,54 @@ export function AchatsSection() {
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle commande</DialogTitle>
               </DialogHeader>
-
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="fournisseur">Fournisseur *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
+                    <Label>Fournisseur *</Label>
+                    {fournisseur.length > 0 ? (
                       <Select value={fournisseurId} onValueChange={setFournisseurId} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un fournisseur" />
-                        </SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Sélectionner un fournisseur" /></SelectTrigger>
                         <SelectContent>
-                          {fournisseur?.map((f: any) => (
-                            <SelectItem key={f.id} value={f.id.toString()}>
-                              {f.nom_fournisseurs}
-                            </SelectItem>
+                          {fournisseur.map((f: any) => (
+                            <SelectItem key={f.id} value={f.id.toString()}>{f.nom_fournisseurs}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className='text-sm text-red-500'>
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord
-                      </p>
+                      <Select disabled><SelectTrigger><SelectValue placeholder="Aucun fournisseur" /></SelectTrigger></Select>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="service">Service *</Label>
-                    <Input
-                      id="service"
-                      value={typeService}
-                      onChange={(e) => setTypeService(e.target.value)}
-                      placeholder="Sélectionnez d'abord un fournisseur"
-                      disabled={!fournisseurId}
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Le service sera automatiquement rempli selon le fournisseur sélectionné
-                    </p>
+                    <Label>Service *</Label>
+                    <Input value={typeService} onChange={(e) => setTypeService(e.target.value)}
+                      placeholder="Service" disabled className="bg-muted"/>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="quantite">Quantité *</Label>
-                    <Input id="quantite"
-                      value={quantite} onChange={(e) => setQuantite(e.target.value)}
-                      type="number" min="1" placeholder="1" required />
+                    <Label>Quantité *</Label>
+                    <Input value={quantite} onChange={(e) => setQuantite(e.target.value)}
+                      type="number" min="1" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prix">Prix unitaire (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" placeholder="1000" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="prix">Prix total (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixTotal} onChange={(e) => setPrixTotal(e.target.value)}
-                      type="number" min="100" placeholder="1000" disabled />
+                    <Label>Prix unitaire *</Label>
+                    <Input value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
+                      type="number" min="100" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de commande *</Label>
-                    <Input id="livraison"
-                      value={dateCommande} onChange={(e) => setDateCommande(e.target.value)}
-                      type="date" />
+                    <Label>Prix total</Label>
+                    <Input value={prixTotal} type="number" disabled />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de livraison</Label>
-                    <Input id="livraison"
-                      value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)}
-                      type="date" />
+                    <Label>Date de commande *</Label>
+                    <Input value={dateCommande} onChange={(e) => setDateCommande(e.target.value)} type="date" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="statut">Statut *</Label>
+                    <Label>Date de livraison</Label>
+                    <Input value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)} type="date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Statut *</Label>
                     <Select value={statut} onValueChange={setStatut} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un statut" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="commande">Commande</SelectItem>
                         <SelectItem value="paye">Payé</SelectItem>
@@ -445,124 +446,59 @@ export function AchatsSection() {
                     </Select>
                   </div>
                   <div className="col-span-2 space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Description détaillée du service" />
+                    <Label>Description</Label>
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
                   <Button type='button' variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                  <Button type='submit'>Créer la commande</Button>
+                  <Button type='submit' disabled={isSubmitting}>
+                    {isSubmitting ? <><RefreshCw className="animate-spin h-4 w-4 mr-2" />Création...</> : "Créer"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
           </Dialog>
-
-          {/* edit */}
           <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DialogTrigger asChild>
-            </DialogTrigger>
             <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Modifier</DialogTitle>
-              </DialogHeader>
-
+              <DialogHeader><DialogTitle>Modifier</DialogTitle></DialogHeader>
               <form onSubmit={handleUpdate}>
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="fournisseur">Fournisseur *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
-                      <Select value={fournisseurId} onValueChange={setFournisseurId} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un fournisseur" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseur?.map((f: any) => (
-                            <SelectItem key={f.id} value={f.id.toString()}>
-                              {f.nom_fournisseurs}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className='text-sm text-red-500'>
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord
-                      </p>
-                    )}
+                    <Label>Fournisseur *</Label>
+                    <Select value={fournisseurId} onValueChange={setFournisseurId} required>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {fournisseur.map((f: any) => (
+                          <SelectItem key={f.id} value={f.id.toString()}>{f.nom_fournisseurs}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="service">Service *</Label>
-                    {fournisseur && fournisseur.length > 0 ? (
-                      <Select value={typeService} onValueChange={setTypeService} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="nom du service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseur.map((f: any) => (
-                            <SelectItem key={f.id} value={f.description}>
-                              {f.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucun fournisseur disponible" />
-                        </SelectTrigger>
-                      </Select>
-                    )}
-                    {fournisseur.length === 0 && (
-                      <p className="text-sm text-red-500">
-                        Aucun fournisseur trouvé. Veuillez en créer un d'abord.
-                      </p>
-                    )}
+                    <Label>Service *</Label>
+                    <Input value={typeService} onChange={(e) => setTypeService(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="quantite">Quantité *</Label>
-                    <Input id="quantite"
-                      value={quantite} onChange={(e) => setQuantite(e.target.value)}
-                      type="number" min="1" placeholder="1" required />
+                    <Label>Quantité *</Label>
+                    <Input value={quantite} onChange={(e) => setQuantite(e.target.value)} type="number" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prix">Prix unitaire (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" placeholder="1000" />
-                  </div>
-
-                  {/* <div className="space-y-2">
-                    <Label htmlFor="prix">Prix total (FCFA)</Label>
-                    <Input id="prix"
-                      value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" placeholder="1000" disabled />
-                  </div> */}
-                  <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de commande *</Label>
-                    <Input id="livraison"
-                      value={dateCommande} onChange={(e) => setDateCommande(e.target.value)}
-                      type="date" />
+                    <Label>Prix unitaire *</Label>
+                    <Input value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)} type="number" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="livraison">Date de livraison</Label>
-                    <Input id="livraison"
-                      value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)}
-                      type="date" />
+                    <Label>Date de commande *</Label>
+                    <Input value={dateCommande} onChange={(e) => setDateCommande(e.target.value)} type="date" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="statut">Statut *</Label>
+                    <Label>Date de livraison</Label>
+                    <Input value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)} type="date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Statut *</Label>
                     <Select value={statut} onValueChange={setStatut} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un statut" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="commande">Commande</SelectItem>
                         <SelectItem value="paye">Payé</SelectItem>
@@ -571,73 +507,57 @@ export function AchatsSection() {
                     </Select>
                   </div>
                   <div className="col-span-2 space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Description détaillée du service" />
+                    <Label>Description</Label>
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button type='button' variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                  <Button type='submit'>Modifier la commande</Button>
+                  <Button type='button' variant="outline" onClick={() => setEditDialogOpen(false)}>Annuler</Button>
+                  <Button type='submit' disabled={isSubmitting}>
+                    {isSubmitting ? <><RefreshCw className="animate-spin h-4 w-4 mr-2" />Mise à jour...</> : "Modifier"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
-
       {/* Statistiques */}
       <div className="grid gap-4 md:grid-cols-4">
-        {/* Total Commandes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Commandes</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(selectCount?.total_achat_commande ?? 0).toLocaleString()}
-            </div>
+            <div className="text-2xl font-bold">{(selectCount?.total_achat_commande ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
-
-        {/* Total Achat */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Achat</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {(selectCount?.total_achats ?? 0).toLocaleString()}
-            </div>
+            <div className="text-2xl font-bold text-orange-600">{(selectCount?.total_achats ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
-
-        {/* Reçus */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Reçus</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {(selectCount?.total_achats_recu ?? 0).toLocaleString()}
-            </div>
+            <div className="text-2xl font-bold text-green-600">{(selectCount?.total_achats_recu ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
-
-        {/* Montant Total */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Montant Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(selectCount?.total_prix_achats ?? 0).toLocaleString()} Fcfa
-            </div>
+            <div className="text-2xl font-bold">{(selectCount?.total_prix_achats ?? 0).toLocaleString()} Fcfa</div>
           </CardContent>
         </Card>
       </div>
@@ -653,39 +573,29 @@ export function AchatsSection() {
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Rechercher par numéro, fournisseur ou service..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+                <Input placeholder="Rechercher..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
               </div>
             </div>
             <Select value={selectedStatut} onValueChange={setSelectedStatut}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrer par statut" />
-              </SelectTrigger>
+              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="tous">Tous les statuts</SelectItem>
-                <SelectItem value="en_attente">En attente</SelectItem>
-                <SelectItem value="confirme">Confirmé</SelectItem>
-                <SelectItem value="recu">Reçu</SelectItem>
-                <SelectItem value="annule">Annulé</SelectItem>
+                <SelectItem value="tous">Tous</SelectItem>
+                <SelectItem value="commande">Commande</SelectItem>
+                <SelectItem value="paye">Payé</SelectItem>
+                <SelectItem value="reçu">Reçu</SelectItem>
               </SelectContent>
             </Select>
             <Select value={selectedPeriode} onValueChange={setSelectedPeriode}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Période" />
-              </SelectTrigger>
+              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="tous">Toutes</SelectItem>
                 <SelectItem value="ce_mois">Ce mois</SelectItem>
                 <SelectItem value="mois_dernier">Mois dernier</SelectItem>
-                <SelectItem value="trimestre">Ce trimestre</SelectItem>
-                <SelectItem value="annee">Cette année</SelectItem>
+                <SelectItem value="trimestre">Trimestre</SelectItem>
+                <SelectItem value="annee">Année</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
           <Table>
             <TableHeader>
               <TableRow>
@@ -701,86 +611,84 @@ export function AchatsSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {achat.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{a.numero_achat}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {new Date(a.created_at).toLocaleString()}
+              {currentAchats.length > 0 ? (
+                currentAchats.map((a: any) => (
+                  <TableRow key={a.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{a.numero_achat}</div>
+                        <div className="text-sm text-muted-foreground">{new Date(a.created_at).toLocaleString()}</div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{a.fournisseur?.nom_fournisseurs}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{a.nom_service}</div>
-                      <div className="text-sm text-muted-foreground max-w-xs truncate">
-                        {a.description}
+                    </TableCell>
+                    <TableCell>{a.fournisseur?.nom_fournisseurs}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{a.nom_service}</div>
+                        <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{a.quantite}</TableCell>
-                  <TableCell>{a.prix_unitaire} Fcfa</TableCell>
-                  <TableCell className="font-medium">{a.prix_total} Fcfa</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatutColor(a.statut)}>
-                      {getStatutLabel(a.statut)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {a.date_livraison ?
-                      new Date(a.date_livraison).toLocaleDateString('fr-FR') :
-                      <span className="text-muted-foreground">Non définie</span>
-                    }
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        onClick={() => handleDownloadFacture(a.id)}
-                        variant="outline"
-                        size="sm"
-                        className="text-primary hover:text-primary-foreground"
-                        title='Générer la facture fournisseur'
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        onClick={() => handleEdit(a)}
-                        variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        onClick={() => handleClick(a)}
-                        variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    </TableCell>
+                    <TableCell>{a.quantite}</TableCell>
+                    <TableCell>{a.prix_unitaire} Fcfa</TableCell>
+                    <TableCell className="font-medium">{a.prix_total} Fcfa</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatutColor(a.statut)}>{getStatutLabel(a.statut)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {a.date_livraison ? new Date(a.date_livraison).toLocaleDateString('fr-FR') :
+                        <span className="text-muted-foreground">Non définie</span>}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button onClick={() => handleDownloadFacture(a.id)} variant="outline" size="sm" title='Facture'>
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => handleEdit(a)} variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => handleClick(a)} variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <DeleteDialog
+                          open={deleteDialogOpen}
+                          openChange={setDeleteDialogOpen}
+                          onConfirm={handleDelete}
+                          itemName={`la commande ${achatDelete?.numero_achat}`}
+                          description="Cela supprimera toutes les actions liés à cet achat. Cette action est irréversible."
+                          isDeleting={isDeleting}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={9} className="h-[400px]">
+                    <div className="flex flex-col items-center justify-center">
+                      <Package className="h-16 w-16 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold text-muted-foreground mb-2">Aucun achat disponible</h3>
+                      <p className="text-sm text-muted-foreground text-center mb-6">
+                        {searchTerm || selectedStatut !== "tous" || selectedPeriode !== "tous"
+                          ? "Aucun achat ne correspond à vos critères de recherche."
+                          : "Vous n'avez pas encore effectué d'achat. Créez votre premier achat pour commencer."}
+                      </p>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
+          {currentAchats.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredAchats.length}
+              itemsPerPage={6}
+              onPageChange={setCurrentPage}
+              className="mt-4"
+            />
+          )}
         </CardContent>
       </Card>
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer la commande {achatDelete?.numero_achat} ?
-              Cela supprimera toutes les ventes liées à ce stock !! Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 } 

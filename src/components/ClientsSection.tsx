@@ -3,9 +3,6 @@ import api from '../api/api';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import {
   Plus,
   Search,
@@ -16,9 +13,14 @@ import {
   User,
   RefreshCw,
   Edit,
-  Trash2
+  Trash2,
+  ShieldAlert
 } from "lucide-react";
 import { toast } from "sonner";
+
+// Import du hook et composant de pagination
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "../components/Pagination";
 
 export function ClientsSection() {
   const [refreshing, setRefreshing] = useState(false);
@@ -28,6 +30,7 @@ export function ClientsSection() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // États du formulaire
   const [nomClient, setNomClient] = useState("");
@@ -50,7 +53,7 @@ export function ClientsSection() {
       console.log('Erreur de récupération', error);
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
-      }else {
+      } else {
         toast.error('Erreur lors du chargement des clients');
       }
       setClient([]);
@@ -145,6 +148,14 @@ export function ClientsSection() {
     c.adresse?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Utilisation du hook de pagination sur les clients filtrés
+  const {
+    currentPage,
+    totalPages,
+    currentData: currentClients,
+    setCurrentPage
+  } = usePagination({ data: filteredClients, itemsPerPage: 4 });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -177,7 +188,6 @@ export function ClientsSection() {
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
-
         </div>
       </div>
 
@@ -202,61 +212,66 @@ export function ClientsSection() {
       {/* Clients grid */}
       <div className="grid gap-6">
         {filteredClients && filteredClients.length > 0 ? (
-          filteredClients.map((c: any) => (
-            <Card key={c.id} className="shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{c?.nom_client}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Client depuis {new Date(c.created_at || Date.now()).toLocaleDateString('fr-FR')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    {c.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span>{c.email}</span>
+          <>
+            {currentClients.map((c: any) => (
+              <Card key={c.id} className="shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <User className="h-6 w-6 text-primary" />
                       </div>
-                    )}
-                    <div className="flex items-center gap-2 text-sm">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{c.numero}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{c.adresse}</span>
+                      <div>
+                        <CardTitle className="text-lg">{c?.nom_client}</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Client depuis {new Date(c.created_at || Date.now()).toLocaleDateString('fr-FR')}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Chiffre d'affaires</span>
-                      <span className="font-semibold text-success">{c.prix_total || 0} Fcfa</span>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      {c.email && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span>{c.email}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{c.numero}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span>{c.adresse}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Achats</span>
-                      <span className="font-semibold">{c.nombre_ventes || 0}</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Chiffre d'affaires</span>
+                        <span className="font-semibold text-success">{c.prix_total || 0} Fcfa</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Achats</span>
+                        <span className="font-semibold">{c.nombre_ventes || 0}</span>
+                      </div>
                     </div>
-                    {/* <div className="flex gap-2 mt-4">
-                      <Button size="sm" variant="outline">
-                        <TrendingUp className="h-4 w-4 mr-1" />
-                        Historique
-                      </Button>
-                    </div> */}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            ))}
+
+            {/* Composant de pagination réutilisable */}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredClients.length}
+              itemsPerPage={6}
+              onPageChange={setCurrentPage}
+            />
+          </>
         ) : (
           <Card className="shadow-[var(--shadow-card)]">
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -270,7 +285,6 @@ export function ClientsSection() {
                   : 'Vous n\'avez pas encore de client. Ajoutez votre premier client pour commencer à développer votre portefeuille.'
                 }
               </p>
-
             </CardContent>
           </Card>
         )}

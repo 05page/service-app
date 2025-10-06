@@ -69,19 +69,9 @@ export const DashboardEmployee = () => {
     } catch (error: any) {
       // Gestion des erreurs
       console.error('Erreur de récupération', error);
-
-      // Cas d'erreur 401 : token invalide ou expiré
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
         window.location.href = '/auth';
-      } 
-      // Cas d'erreur 403 : accès interdit
-      else if (error.response?.status === 403) {
-        toast.error(error.response?.data?.message || 'Accès refusé');
-      } 
-      // Autres erreurs
-      else {
-        toast.error('Erreur lors du chargement des données');
       }
 
       // On vide la liste des ventes en cas d'erreur
