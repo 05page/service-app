@@ -39,7 +39,7 @@ export function AppSidebar({ activeSection, onSectionChange, userRole }: Sidebar
         { id: "achats", label: "Achats", icon: TrendingUp },
         { id: "stock", label: "Stock", icon: Package },
         { id: "profile", label: "Mon Profil", icon: User },
-        // { id: "commissions", label: "Commissions", icon: Wallet },
+        { id: "commissions", label: "Commissions", icon: Wallet },
         // { id: "settings", label: "Paramètres", icon: Settings },
       ];
     }
