@@ -619,31 +619,31 @@ export function VentesSection() {
                             <p className="text-sm text-muted-foreground">Date</p>
                             <p className="text-sm">{new Date(v.created_at).toLocaleDateString('fr-FR')}</p>
                           </div>
+                        </div>
 
-                          <div className="flex gap-2 justify-end">
-                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm">
-                              {v.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleClick(v)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                            <DeleteDialog
-                              open={deleteDialogOpen}
-                              openChange={setDeleteDialogOpen}
-                              onConfirm={handleDelete}
-                              itemName={`la commande ${venteDelete?.reference}`}
-                              description="Cela suprrimera toutes les actions liées à cette vente. Cette action est irréversible."
-                              isDeleting={isDeleting}
-                            />
-                          </div>
+                        <div className="flex gap-2 justify-end border-t pt-3 mt-3">
+                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm">
+                            {v.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleClick(v)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <DeleteDialog
+                            open={deleteDialogOpen}
+                            openChange={setDeleteDialogOpen}
+                            onConfirm={handleDelete}
+                            itemName={`la commande ${venteDelete?.reference}`}
+                            description="Cela suprrimera toutes les actions liées à cette vente. Cette action est irréversible."
+                            isDeleting={isDeleting}
+                          />
                         </div>
                       </div>
                     ))}
