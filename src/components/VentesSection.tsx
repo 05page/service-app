@@ -40,6 +40,9 @@ type Ventes = {
   total_client?: number; // Pour admin
   mes_clients?: number; // Pour employé
   chiffres_affaire_mois: string;
+  taux_commission?: number;
+  commissions_payees?: string;
+  commissions_en_attente?: string;
 }
 
 // Composant principal pour la section Ventes
@@ -481,7 +484,7 @@ export function VentesSection() {
       </div>
 
       {/* Summary cards (stats) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total ventes */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -490,60 +493,110 @@ export function VentesSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {vente?.chiffres_affaire_total ? parseFloat(vente.chiffres_affaire_total).toLocaleString('fr-FR') : 0}
-              Fcfa</div>
-            <p className="text-xs text-muted-foreground">Ce mois</p>
+              {vente?.chiffres_affaire_total ? parseFloat(vente.chiffres_affaire_total).toLocaleString('fr-FR') : 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">Chiffre d'affaires total</p>
+          </CardContent>
+        </Card>
+
+        {/* Ventes réglées */}
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ventes réglées</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{vente?.ventes_paye || 0}</div>
+            <p className="text-xs text-muted-foreground">Paiements complétés</p>
           </CardContent>
         </Card>
 
         {/* Ventes en attente */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En attente</CardTitle>
+            <CardTitle className="text-sm font-medium">Non réglées</CardTitle>
             <TrendingUp className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">{vente?.ventes_en_attente || 0}</div>
-            <p className="text-xs text-muted-foreground">Ventes en attente</p>
-          </CardContent>
-        </Card>
-
-        {/* Total ventes effectuées */}
-        <Card className="shadow-[var(--shadow-card)]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ventes Effectuées</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{vente?.total_ventes || 0}</div>
-            <p className="text-xs text-muted-foreground">Ventes éffectuées</p>
+            <p className="text-xs text-muted-foreground">En attente de paiement</p>
           </CardContent>
         </Card>
 
         {/* Total clients */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total client</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total clients</CardTitle>
+            <User className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               {vente?.total_client || vente?.mes_clients || 0}
             </div>
-            <p className="text-xs text-muted-foreground">Clients</p>
+            <p className="text-xs text-muted-foreground">Clients actifs</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Statistiques de commissions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-primary/5 to-primary/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Taux de commission</CardTitle>
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">
+              {vente?.taux_commission || 5}%
+            </div>
+            <p className="text-xs text-muted-foreground">Sur ventes réglées</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-success/5 to-success/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Commissions payées</CardTitle>
+            <CreditCard className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">
+              {vente?.commissions_payees ? parseFloat(vente.commissions_payees).toLocaleString('fr-FR') : 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">Commissions versées</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-warning/5 to-warning/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Commissions en attente</CardTitle>
+            <Package className="h-4 w-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-warning">
+              {vente?.commissions_en_attente ? parseFloat(vente.commissions_en_attente).toLocaleString('fr-FR') : 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">Ventes non soldées</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Section recherche et filtres */}
-      <Tabs value={filterTab} onValueChange={setFilterTab}>
-        <TabsList>
-          <TabsTrigger value="all">Toutes les ventes</TabsTrigger>
-          <TabsTrigger value="regle">Réglées</TabsTrigger>
-          <TabsTrigger value="non_regle">Non réglées</TabsTrigger>
-        </TabsList>
+      <Tabs value={filterTab} onValueChange={setFilterTab} className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Toutes ({selectVentes.length})
+            </TabsTrigger>
+            <TabsTrigger value="regle" className="data-[state=active]:bg-success data-[state=active]:text-white">
+              Réglées ({selectVentes.filter((v: any) => v.statut_paiement === "réglé").length})
+            </TabsTrigger>
+            <TabsTrigger value="non_regle" className="data-[state=active]:bg-warning data-[state=active]:text-white">
+              Non réglées ({selectVentes.filter((v: any) => v.statut_paiement === "non réglé" || v.statut_paiement === "partiel").length})
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value={filterTab} className="space-y-4 mt-6">
+        <TabsContent value={filterTab} className="space-y-4 mt-0">
           <Card className="shadow-[var(--shadow-card)]">
             <CardHeader>
               <div className="flex items-center justify-between">
