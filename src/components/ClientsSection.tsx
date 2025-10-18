@@ -209,86 +209,112 @@ export function ClientsSection() {
         </CardContent>
       </Card>
 
-      {/* Clients grid */}
-      <div className="grid gap-6">
-        {filteredClients && filteredClients.length > 0 ? (
-          <>
-            {currentClients.map((c: any) => (
-              <Card key={c.id} className="shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <User className="h-6 w-6 text-primary" />
+      {/* Clients list */}
+      <Card className="shadow-[var(--shadow-card)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Liste des clients ({filteredClients.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {filteredClients && filteredClients.length > 0 ? (
+              <>
+                {currentClients.map((c: any) => (
+                  <div 
+                    key={c.id} 
+                    className="border rounded-lg p-4 hover:shadow-md hover:border-primary/50 transition-all group"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Avatar et infos principales */}
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/5 rounded-full flex items-center justify-center ring-2 ring-primary/10">
+                          <User className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base group-hover:text-primary transition-colors">
+                            {c?.nom_client}
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Client depuis {new Date(c.created_at || Date.now()).toLocaleDateString('fr-FR', { 
+                              day: 'numeric', 
+                              month: 'long', 
+                              year: 'numeric' 
+                            })}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-lg">{c?.nom_client}</CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Client depuis {new Date(c.created_at || Date.now()).toLocaleDateString('fr-FR')}
-                        </p>
+
+                      {/* Stats rapides */}
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Chiffre d'affaires</p>
+                          <p className="font-bold text-success text-sm">{c.prix_total || 0} Fcfa</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Achats</p>
+                          <p className="font-bold text-sm">{c.nombre_ventes || 0}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
+
+                    {/* Coordonnées */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 pt-3 border-t">
                       {c.email && (
                         <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span>{c.email}</span>
+                          <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center">
+                            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                          <span className="truncate">{c.email}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center">
+                          <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
                         <span>{c.numero}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{c.adresse}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Chiffre d'affaires</span>
-                        <span className="font-semibold text-success">{c.prix_total || 0} Fcfa</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Achats</span>
-                        <span className="font-semibold">{c.nombre_ventes || 0}</span>
+                        <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center">
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <span className="truncate">{c.adresse}</span>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                ))}
 
-            {/* Composant de pagination réutilisable */}
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredClients.length}
-              itemsPerPage={6}
-              onPageChange={setCurrentPage}
-            />
-          </>
-        ) : (
-          <Card className="shadow-[var(--shadow-card)]">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <User className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                {searchTerm ? 'Aucun client trouvé' : 'Aucun client disponible'}
-              </h3>
-              <p className="text-sm text-muted-foreground text-center mb-6">
-                {searchTerm 
-                  ? `Aucun client ne correspond à votre recherche "${searchTerm}"`
-                  : 'Vous n\'avez pas encore de client. Ajoutez votre premier client pour commencer à développer votre portefeuille.'
-                }
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                {/* Composant de pagination réutilisable */}
+                <div className="pt-2">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={filteredClients.length}
+                    itemsPerPage={4}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                  <User className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                  {searchTerm ? 'Aucun client trouvé' : 'Aucun client disponible'}
+                </h3>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  {searchTerm 
+                    ? `Aucun client ne correspond à votre recherche "${searchTerm}"`
+                    : 'Vous n\'avez pas encore de client.'
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
