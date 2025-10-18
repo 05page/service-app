@@ -1,232 +1,738 @@
+import { useState, useEffect } from "react";
+import api from "../api/api"
+import DeleteDialog from "./Form/DeleteDialog";
+import FormVente from "./Form/FormVente";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { ArrowRight, Users, ShoppingCart, Package, Shield, Sparkles, Zap, TrendingUp } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Plus,
+  Search,
+  Calendar,
+  User,
+  Package,
+  Euro,
+  TrendingUp,
+  ShoppingCart,
+  RefreshCw,
+  ShieldAlert,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  FileText,
+  Receipt,
+  CreditCard,
+  CheckCircle,
+  XCircle,
+  Image as ImageIcon
+} from "lucide-react";
+import { toast } from 'sonner';
 
-const Landing = () => {
+type Ventes = {
+  ventes_en_attente: number;
+  total_ventes: number;
+  ventes_paye: number;
+  chiffres_affaire_total: string;
+  total_client?: number;
+  mes_clients?: number;
+  chiffres_affaire_mois: string;
+}
+
+export function VentesSection() {
+  const [vente, setVentes] = useState<Ventes | null>(null);
+  const [selectedVente, setSelectedVente] = useState<any>(null);
+  const [selectVentes, setSelectVentes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [reglementDialogOpen, setReglementDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [venteDelete, setVendelete] = useState<any | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stock, setStock] = useState([]);
+  const [stockId, setStockId] = useState("");
+  const [client, setClient] = useState("");
+  const [numero, setNumero] = useState("");
+  const [adresse, setAdresse] = useState("");
+  const [quantite, setQuantite] = useState("");
+  const [prixUnitaire, setPrixUnitaire] = useState("");
+  const [prixTotal, setPrixTotal] = useState("");
+  const [filterTab, setFilterTab] = useState("all");
+  
+  // États pour règlements
+  const [montantPaye, setMontantPaye] = useState("");
+  const [dateReglement, setDateReglement] = useState(new Date().toISOString().split('T')[0]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+
+  const fetchVentesStats = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error('token non trouvé')
+        return
+      }
+      const role = localStorage.getItem("userRole");
+      const endpoint = role === "admin" ? "/allStats" : "/ventes/myStats";
+      const response = await api.get(endpoint);
+      setVentes(response.data.data)
+    } catch (error: any) {
+      console.error('Erreur de récupération', error);
+      if (error.response?.status === 401) {
+        toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
+        window.location.href = '/auth'
+      } else {
+        toast.error('Erreur lors du chargement des données');
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selectVente = async () => {
+    try {
+      const response = await api.get('/ventes/');
+      setSelectVentes(response.data.data || [])
+    } catch (error: any) {
+      console.error('Erreur survenue lors de la récupération des ventes', error);
+      if (error.response?.status === 403) {
+        setAccessDenied(true);
+        toast.error('Accès refusé. Vous n\'avez pas les permissions nécessaires');
+      } else {
+        toast.error('Erreur lors du chargement des données');
+      }
+      setSelectVentes([]);
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchFormData = async () => {
+    try {
+      const stockResponse = await api.get('/stock/');
+      setStock(stockResponse.data.data || []);
+    } catch (error: any) {
+      console.error('Erreur lors du chargement des données du formulaire', error);
+      toast.error('Erreur lors du chargement des données');
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockId || !client || !numero || !adresse || !quantite || !prixUnitaire) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+    setIsSubmitting(true);
+
+    try {
+      const response = await api.post('/ventes/', {
+        stock_id: parseInt(stockId),
+        nom_client: client,
+        numero,
+        adresse,
+        quantite: parseInt(quantite),
+      });
+      toast.success(response.data.message || 'Vente créée avec succès');
+      setDialogOpen(false);
+      fetchVentesStats();
+      selectVente();
+    } catch (error: any) {
+      console.error('Erreur création vente:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de la création de la vente";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const handleEdit = (upVente: any) => {
+    setSelectedVente(upVente)
+    setStockId(upVente.stock_id.toString() || "");
+    setClient(upVente?.nom_client || "");
+    setNumero(upVente?.numero || "");
+    setAdresse(upVente?.adresse || "");
+    setQuantite(upVente?.quantite || "")
+    setEditDialogOpen(true)
+  }
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVente) return
+    if (!stockId || !client || !numero || !adresse || !quantite || !prixUnitaire) {
+      toast.error("Veuillez remplir tous les champs obligatoires")
+      return
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await api.put(`/ventes/${selectedVente.id}`, {
+        stock_id: parseInt(stockId),
+        nom_client: client,
+        numero,
+        adresse,
+        quantite: parseInt(quantite),
+      })
+      toast.success(response.data.message || "Vente mis à jour");
+      setVentes(null);
+      resetForm();
+      await fetchVentesStats();
+      await selectVente();
+      setEditDialogOpen(false);
+    } catch (error: any) {
+      console.error(error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de mise à jour de la vente";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleAddReglement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVente || !montantPaye) {
+      toast.error('Veuillez entrer un montant');
+      return;
+    }
+    
+    try {
+      // Appel API pour ajouter un règlement
+      toast.success('Règlement ajouté avec succès');
+      setReglementDialogOpen(false);
+      setMontantPaye("");
+      await fetchVentesStats();
+      await selectVente();
+    } catch (error: any) {
+      toast.error('Erreur lors de l\'ajout du règlement');
+    }
+  }
+
+  const resetForm = () => {
+    setStockId("");
+    setClient("");
+    setNumero("");
+    setAdresse("");
+    setQuantite("");
+    setPrixUnitaire("");
+    setPrixTotal("");
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchVentesStats(),
+        selectVente()
+      ]);
+      toast.success('Données actualisées');
+    } catch (error) {
+      toast.error('Erreur lors de l\'actualisation');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const handleDownloadFacture = async (venteId: string, isRecu: boolean = false) => {
+    try {
+      toast.info(`Génération ${isRecu ? 'du reçu' : 'de la facture'} en cours...`);
+      const response = await api.get(`factures/vente/${venteId}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${isRecu ? 'recu' : 'facture'}-${venteId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success(`${isRecu ? 'Reçu' : 'Facture'} téléchargé avec succès`);
+    } catch (error: any) {
+      toast.error('Erreur lors du téléchargement');
+    }
+  }
+
+  const handleClick = (v: any) => {
+    setVendelete(v)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (venteDelete) {
+      try {
+        await api.delete(`ventes/${venteDelete.id}`);
+        await Promise.all([fetchVentesStats(), selectVente()]);
+        toast.success(`Vente ${venteDelete?.reference} supprimé avec succès`)
+        setDeleteDialogOpen(false);
+        setVendelete(null);
+      } catch (error: any) {
+        toast.error("Erreur lors de la suppression");
+        console.error(error.response?.data || error);
+      } finally {
+        setIsDeleting(false)
+      }
+    }
+  }
+
+  const handleViewDetails = (vente: any) => {
+    setSelectedVente(vente);
+    setDetailDialogOpen(true);
+  }
+
+  const handleOpenReglement = (vente: any) => {
+    setSelectedVente(vente);
+    setReglementDialogOpen(true);
+  }
+
+  useEffect(() => {
+    fetchVentesStats()
+    selectVente()
+    fetchFormData()
+  }, [])
+
+  useEffect(() => {
+    const q = parseInt(quantite) || 0;
+    const pU = parseFloat(prixUnitaire) || 0;
+    setPrixTotal((q * pU).toFixed(2))
+  }, [quantite, prixUnitaire])
+
+  useEffect(() => {
+    if (stockId) {
+      const selectedStock = stock.find((s: any) => s.id === parseInt(stockId));
+      if (selectedStock) {
+        setPrixUnitaire(selectedStock.prix_vente.toString());
+      }
+    }
+  }, [stockId, stock]);
+
+  // Filtrer les ventes selon le statut
+  const filteredVentes = selectVentes.filter((v: any) => {
+    if (filterTab === "all") return true;
+    if (filterTab === "regle") return v.statut_paiement === "réglé";
+    if (filterTab === "non_regle") return v.statut_paiement === "non réglé" || v.statut_paiement === "partiel";
+    return true;
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentVentes = filteredVentes.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredVentes.length / itemsPerPage);
+
+  const goToNextPage = () => {
+    setCurrentPage(page => Math.min(page + 1, totalPages));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(page => Math.max(page - 1, 1));
+  };
+
+  const goToPage = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Chargement des ventes...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8 text-center">
+            <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Accès refusé</h2>
+            <p className="text-muted-foreground">
+              Vous n'avez pas la permission d'accéder à la gestion des ventes.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 overflow-hidden">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Ventes & Règlements</h1>
+          <p className="text-muted-foreground">
+            Gérez vos ventes, facturations et règlements
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md">
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvelle vente
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Créer une nouvelle vente</DialogTitle>
+              </DialogHeader>
+              <FormVente
+                stock={stock}
+                setStock={setStock}
+                stockId={stockId}
+                setStockId={setStockId}
+                client={client}
+                setClient={setClient}
+                numero={numero}
+                setNumero={setNumero}
+                adresse={adresse}
+                setAdresse={setAdresse}
+                quantite={quantite}
+                setQuantite={setQuantite}
+                prixUnitaire={prixUnitaire}
+                setPrixUnitaire={setPrixUnitaire}
+                prixTotal={prixTotal}
+                setPrixTotal={setPrixTotal}
+                isSubmitting={isSubmitting}
+                setDialogOpen={setDialogOpen}
+                setEditDialogOpen={setEditDialogOpen}
+                handleSubmit={handleSubmit}
+                handleUpdate={handleUpdate}
+                resetForm={resetForm}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Modifier la vente</DialogTitle>
+              </DialogHeader>
+              <FormVente
+                isEdit
+                stock={stock}
+                setStock={setStock}
+                stockId={stockId}
+                setStockId={setStockId}
+                client={client}
+                setClient={setClient}
+                numero={numero}
+                setNumero={setNumero}
+                adresse={adresse}
+                setAdresse={setAdresse}
+                quantite={quantite}
+                setQuantite={setQuantite}
+                prixUnitaire={prixUnitaire}
+                setPrixUnitaire={setPrixUnitaire}
+                prixTotal={prixTotal}
+                setPrixTotal={setPrixTotal}
+                isSubmitting={isSubmitting}
+                setDialogOpen={setDialogOpen}
+                setEditDialogOpen={setEditDialogOpen}
+                handleSubmit={handleSubmit}
+                handleUpdate={handleUpdate}
+                resetForm={resetForm}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Header */}
-      <header className="relative border-b bg-background/80 backdrop-blur-md animate-fade-in">
-
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <ShoppingCart className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <h1 className="text-xl font-bold text-foreground">CommercePro</h1>
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total ventes</CardTitle>
+            <Euro className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">
+              {vente?.chiffres_affaire_total ? parseFloat(vente.chiffres_affaire_total).toLocaleString('fr-FR') : 0} Fcfa
             </div>
-            <Link to="/auth">
-              <Button variant="outline" className="gap-2">
-                Se connecter
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+            <p className="text-xs text-muted-foreground">Ce mois</p>
+          </CardContent>
+        </Card>
 
-      {/* Hero Section */}
-      <section className="relative py-32">
-        <div className="container mx-auto px-6 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8 animate-fade-in">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Nouveau : Gestion de stock intelligente</span>
-          </div>
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Réglées</CardTitle>
+            <CheckCircle className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{vente?.ventes_paye || 0}</div>
+            <p className="text-xs text-muted-foreground">Ventes réglées</p>
+          </CardContent>
+        </Card>
 
-          <h2 className="text-5xl md:text-7xl font-bold text-foreground mb-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            Gérez votre activité commerciale
-            <span className="block mt-2 bg-gradient-to-r from-primary via-primary/80 to-secondary bg-clip-text text-transparent">
-              en toute simplicité
-            </span>
-          </h2>
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Non réglées</CardTitle>
+            <XCircle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{vente?.ventes_en_attente || 0}</div>
+            <p className="text-xs text-muted-foreground">Ventes en attente</p>
+          </CardContent>
+        </Card>
 
-          <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '0.4s' }}>
-            Plateforme complète pour acheter, revendre et gérer vos services avec un système de gestion de stock avancé.
-          </p>
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Clients</CardTitle>
+            <User className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{vente?.total_client || vente?.mes_clients || 0}</div>
+            <p className="text-xs text-muted-foreground">Total clients</p>
+          </CardContent>
+        </Card>
+      </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            <Link to="/auth">
-              <Button size="lg" className="gap-2 px-8 py-6 text-lg group relative overflow-hidden">
-                <span className="relative z-10 flex items-center gap-2">
-                  Accéder à l'application
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </Button>
-            </Link>
-          </div>
+      {/* Tabs pour filtrer */}
+      <Tabs value={filterTab} onValueChange={setFilterTab}>
+        <TabsList>
+          <TabsTrigger value="all">Toutes les ventes</TabsTrigger>
+          <TabsTrigger value="regle">Réglées</TabsTrigger>
+          <TabsTrigger value="non_regle">Non réglées</TabsTrigger>
+        </TabsList>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-8 max-w-3xl mx-auto mt-20 animate-fade-in" style={{ animationDelay: '0.8s' }}>
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-foreground mb-2">500+</div>
-              <div className="text-sm text-muted-foreground">Entreprises</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-foreground mb-2">98%</div>
-              <div className="text-sm text-muted-foreground">Satisfaction</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-foreground mb-2">24/7</div>
-              <div className="text-sm text-muted-foreground">Support</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="relative py-20 bg-muted/30">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16 animate-fade-in">
-            <h3 className="text-4xl font-bold mb-4 text-foreground">
-              Une solution complète pour votre business
-            </h3>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Tous les outils dont vous avez besoin pour gérer votre commerce efficacement
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                icon: Users,
-                title: "Gestion clients",
-                description: "Gérez vos clients, intermédiaires et employés facilement",
-                delay: "0s",
-                gradient: "from-blue-500/10 to-blue-600/10"
-              },
-              {
-                icon: ShoppingCart,
-                title: "Achats & Ventes",
-                description: "Suivez vos achats chez les fournisseurs et vos ventes clients",
-                delay: "0.1s",
-                gradient: "from-purple-500/10 to-purple-600/10"
-              },
-              {
-                icon: Package,
-                title: "Gestion de stock",
-                description: "Gérez votre inventaire et suivez vos stocks en temps réel",
-                delay: "0.2s",
-                gradient: "from-green-500/10 to-green-600/10"
-              },
-              {
-                icon: Shield,
-                title: "Sécurisé",
-                description: "Accès sécurisé avec différents niveaux de permissions",
-                delay: "0.3s",
-                gradient: "from-orange-500/10 to-orange-600/10"
-              }
-            ].map((feature, index) => (
-              <Card
-                key={index}
-                className="group p-6 border-border bg-card hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 animate-fade-in cursor-pointer relative overflow-hidden"
-                style={{ animationDelay: feature.delay }}
-              >
-                <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-                <div className="relative">
-                  <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500">
-                    <feature.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <h4 className="font-semibold mb-2 text-card-foreground text-lg">{feature.title}</h4>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {feature.description}
-                  </p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="relative py-20">
-        <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6 animate-fade-in">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-primary">Performance optimale</span>
-              </div>
-              <h3 className="text-4xl font-bold text-foreground">
-                Augmentez votre productivité de 300%
-              </h3>
-              <p className="text-lg text-muted-foreground">
-                Automatisez vos processus de gestion et concentrez-vous sur la croissance de votre entreprise.
-              </p>
-              <ul className="space-y-4">
-                {[
-                  "Tableau de bord intuitif en temps réel",
-                  "Rapports automatiques détaillés",
-                  "Notifications intelligentes",
-                  "Multi-utilisateurs avec permissions"
-                ].map((item, index) => (
-                  <li key={index} className="flex items-center gap-3 text-foreground">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <div className="h-2 w-2 rounded-full bg-primary"></div>
-                    </div>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="relative animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              <div className="aspect-square rounded-2xl bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 p-8 backdrop-blur-sm border border-primary/10">
-                <div className="w-full h-full rounded-xl bg-card/50 backdrop-blur-sm flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
-                      99.9%
-                    </div>
-                    <div className="text-xl text-muted-foreground">Disponibilité</div>
-                  </div>
+        <TabsContent value={filterTab} className="space-y-4 mt-6">
+          <Card className="shadow-[var(--shadow-card)]">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Liste des ventes</CardTitle>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Rechercher..." className="pl-10" />
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {currentVentes.length > 0 ? (
+                  currentVentes.map((v: any) => (
+                    <div key={v.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                        <div className="flex items-center gap-3">
+                          {v.photo_url ? (
+                            <img src={v.photo_url} alt={v.nom_produit} className="w-12 h-12 rounded object-cover" />
+                          ) : (
+                            <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
+                              <Package className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold">{v.reference}</p>
+                            <p className="text-sm text-muted-foreground">{v.nom_produit}</p>
+                          </div>
+                        </div>
 
-      {/* CTA Section */}
-      <section className="relative py-20">
-        <div className="container mx-auto px-6">
-          <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5 animate-fade-in">
-            <div className="absolute inset-0 bg-grid-white/5 [mask-image:radial-gradient(white,transparent_70%)]"></div>
-            <div className="relative p-12 text-center">
-              <h3 className="text-4xl font-bold mb-6 text-foreground">
-                Prêt à démarrer ?
-              </h3>
-              <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                Rejoignez des centaines d'entreprises qui font confiance à CommercePro
-              </p>
-              <Link to="/auth">
-                <Button size="lg" className="gap-2 px-8 py-6 text-lg group hover-scale">
-                  Commencer maintenant
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
-            </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Client</p>
+                          <p className="font-medium">{v.nom_client}</p>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-muted-foreground">Montant</p>
+                          <p className="font-semibold text-success">{v.prix_total} Fcfa</p>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-muted-foreground">Statut</p>
+                          <Badge variant={v.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
+                            {v.statut_paiement || 'non réglé'}
+                          </Badge>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-muted-foreground">Date</p>
+                          <p className="text-sm">{new Date(v.created_at).toLocaleDateString('fr-FR')}</p>
+                        </div>
+
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleOpenReglement(v)}>
+                            <CreditCard className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleDownloadFacture(v.id, v.statut_paiement !== 'réglé')}
+                          >
+                            {v.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Aucune vente à afficher
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={goToPreviousPage}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="flex gap-2">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        onClick={() => goToPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={goToNextPage}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </CardContent>
           </Card>
-        </div>
-      </section>
+        </TabsContent>
+      </Tabs>
 
-      {/* Footer */}
-      <footer className="relative border-t bg-background/80 backdrop-blur-md">y
-        <div className="container mx-auto px-6 py-8">
-          <div className="text-center text-muted-foreground">
-            <p>&copy; 2024 CommercePro. Plateforme de gestion commerciale.</p>
-          </div>
-        </div>
-      </footer>
+      {/* Dialog Détails */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Détails de la vente</DialogTitle>
+          </DialogHeader>
+          {selectedVente && (
+            <div className="space-y-4">
+              {selectedVente.photo_url && (
+                <img src={selectedVente.photo_url} alt="Produit" className="w-full h-48 object-cover rounded" />
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Référence</p>
+                  <p className="font-semibold">{selectedVente.reference}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Produit</p>
+                  <p className="font-semibold">{selectedVente.nom_produit}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Client</p>
+                  <p className="font-semibold">{selectedVente.nom_client}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Téléphone</p>
+                  <p className="font-semibold">{selectedVente.numero}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Adresse</p>
+                  <p className="font-semibold">{selectedVente.adresse}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Quantité</p>
+                  <p className="font-semibold">{selectedVente.quantite}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Prix total</p>
+                  <p className="font-semibold text-success">{selectedVente.prix_total} Fcfa</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Statut paiement</p>
+                  <Badge variant={selectedVente.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
+                    {selectedVente.statut_paiement || 'non réglé'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Règlement */}
+      <Dialog open={reglementDialogOpen} onOpenChange={setReglementDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un règlement</DialogTitle>
+          </DialogHeader>
+          {selectedVente && (
+            <form onSubmit={handleAddReglement} className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Vente: {selectedVente.reference}</p>
+                <p className="font-semibold mb-4">Montant total: {selectedVente.prix_total} Fcfa</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Montant payé</label>
+                <Input
+                  type="number"
+                  value={montantPaye}
+                  onChange={(e) => setMontantPaye(e.target.value)}
+                  placeholder="Entrez le montant"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Date de règlement</label>
+                <Input
+                  type="date"
+                  value={dateReglement}
+                  onChange={(e) => setDateReglement(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="outline" onClick={() => setReglementDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit">
+                  Enregistrer le règlement
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <DeleteDialog
+        open={deleteDialogOpen}
+        openChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        itemName={venteDelete?.reference || "cette vente"}
+        isDeleting={isDeleting}
+      />
     </div>
   );
-};
-
-export default Landing;
+}

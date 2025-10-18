@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign, RefreshCw, FileText, ShieldAlert } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign, RefreshCw, FileText, ShieldAlert, Image as ImageIcon, Eye } from "lucide-react";
 import { toast } from 'sonner';
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
@@ -47,9 +47,12 @@ export function AchatsSection() {
   const [dateLivraison, setDateLivraison] = useState("");
   const [statut, setStatut] = useState("");
   const [description, setDescription] = useState("");
+  const [photo, setPhoto] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [achatDelete, setAchatDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detail, setDetail] = useState<any>(null);
 
   const fecthAchats = async () => {
     try {
@@ -148,7 +151,8 @@ export function AchatsSection() {
       setDateLivraison("");
       setStatut("");
       setDescription("");
-      setDialogOpen(false)
+      setPhoto("");
+      setDialogOpen(false);
       getAchats();
       fecthAchats();
     } catch (error: any) {
@@ -170,6 +174,7 @@ export function AchatsSection() {
     setDateLivraison(upAchat.date_livraison || "");
     setStatut(upAchat.statut || "");
     setDescription(upAchat.description || "");
+    setPhoto(upAchat.photo || "");
     setEditDialogOpen(true);
   };
 
@@ -602,6 +607,7 @@ export function AchatsSection() {
                 <TableHead>Commande</TableHead>
                 <TableHead>Fournisseur</TableHead>
                 <TableHead>Service</TableHead>
+                <TableHead>Photo</TableHead>
                 <TableHead>Quantité</TableHead>
                 <TableHead>Prix unitaire</TableHead>
                 <TableHead>Total</TableHead>
@@ -628,6 +634,15 @@ export function AchatsSection() {
                       </div>
                     </TableCell>
                     <TableCell>{a.quantite}</TableCell>
+                    <TableCell>
+                      {a.photo ? (
+                        <img src={photo} alt='produit' className='h-10 w-10 object-cover rounded'/>
+                      ): (
+                        <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>{a.prix_unitaire} Fcfa</TableCell>
                     <TableCell className="font-medium">{a.prix_total} Fcfa</TableCell>
                     <TableCell>
@@ -639,6 +654,9 @@ export function AchatsSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button onClick={() => {setDetail(a); setDetailDialogOpen(true)}} variant="outline" size="sm" title='Détails'>
+                          <Eye className='h-4 w-4'/>
+                        </Button>
                         <Button onClick={() => handleDownloadFacture(a.id)} variant="outline" size="sm" title='Facture'>
                           <FileText className="h-4 w-4" />
                         </Button>
@@ -646,7 +664,7 @@ export function AchatsSection() {
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button onClick={() => handleClick(a)} variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className= "h-4 w-4" />
                         </Button>
                         <DeleteDialog
                           open={deleteDialogOpen}
@@ -689,6 +707,80 @@ export function AchatsSection() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog Détails */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Détails de l'achat {detail?.numero_achat}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="grid gap-6">
+              <div className="flex gap-6">
+                <div className="flex-shrink-0">
+                  {detail.photo ? (
+                    <img src={detail.photo} alt="Produit" className="h-48 w-48 object-cover rounded-lg" />
+                  ) : (
+                    <div className="h-48 w-48 bg-muted rounded-lg flex items-center justify-center">
+                      <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 grid gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fournisseur</p>
+                    <p className="font-medium">{detail.fournisseur?.nom_fournisseurs}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Service</p>
+                    <p className="font-medium">{detail.nom_service}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Quantité</p>
+                      <p className="font-medium">{detail.quantite}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Prix unitaire</p>
+                      <p className="font-medium">{detail.prix_unitaire?.toLocaleString()} Fcfa</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Prix total</p>
+                    <p className="text-2xl font-bold">{detail.prix_total?.toLocaleString()} Fcfa</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Date de commande</p>
+                  <p className="font-medium">{new Date(detail.date_commande).toLocaleDateString('fr-FR')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date de livraison</p>
+                  <p className="font-medium">
+                    {detail.date_livraison 
+                      ? new Date(detail.date_livraison).toLocaleDateString('fr-FR') 
+                      : "Non définie"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Statut</p>
+                  <Badge variant={getStatutColor(detail.statut)}>
+                    {getStatutLabel(detail.statut)}
+                  </Badge>
+                </div>
+              </div>
+              {detail.description && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Description</p>
+                  <p className="text-sm">{detail.description}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

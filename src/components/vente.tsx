@@ -20,17 +20,9 @@ import {
   RefreshCw,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight,
-  Eye,
-  Image as ImageICon,
-  CreditCard,
-  FileText,
-  Receipt,
-  Edit,
-  Trash2
+  ChevronRight
 } from "lucide-react";
 import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 // Définition d'un type pour les statistiques des ventes
 type Ventes = {
   ventes_en_attente: number;
@@ -66,12 +58,10 @@ export function VentesSection() {
   const [quantite, setQuantite] = useState(""); // Quantité vendue
   const [prixUnitaire, setPrixUnitaire] = useState(""); // Prix unitaire
   const [prixTotal, setPrixTotal] = useState(""); // Prix total calculé automatiquement
-  const [photo, setPhoto] = useState("");
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
   // États pour la pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
-  const [filterTab, setFilterTab] = useState("all")
   // Récupère les statistiques de ventes (admin ou employé)
   const fetchVentesStats = async () => {
     try {
@@ -172,7 +162,7 @@ export function VentesSection() {
 
   const handleEdit = (upVente: any) => {
     setSelectedVente(upVente)
-    setStockId(upVente.stock_id?.toString() || "");
+    setStockId(upVente.stock_id.toString() || "");
     setClient(upVente?.nom_client || "");
     setNumero(upVente?.numero || "");
     setAdresse(upVente?.adresse || "");
@@ -220,7 +210,6 @@ export function VentesSection() {
     setQuantite("");
     setPrixUnitaire("");
     setPrixTotal("");
-    setPhoto("")
   }
   // Actualisation des données
   const handleRefresh = async () => {
@@ -277,11 +266,6 @@ export function VentesSection() {
     }
   }
 
-  const handleViewDetails = (vente: any) => {
-    setSelectedVente(vente);
-    setDetailDialogOpen(true);
-  }
-
   const handleClick = (v: any) => {
     setVendelete(v)
     setDeleteDialogOpen(true)
@@ -326,19 +310,11 @@ export function VentesSection() {
     }
   }, [stockId, stock]);
 
-    // Filtrer les ventes selon le statut
-  const filteredVentes = selectVentes.filter((v: any) => {
-    if (filterTab === "all") return true;
-    if (filterTab === "regle") return v.statut_paiement === "réglé";
-    if (filterTab === "non_regle") return v.statut_paiement === "non réglé" || v.statut_paiement === "partiel";
-    return true;
-  });
-
   // Calculs pour la pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentVentes = filteredVentes.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredVentes.length / itemsPerPage);
+  const currentVentes = selectVentes.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(selectVentes.length / itemsPerPage);
 
   // Fonctions de navigation
   const goToNextPage = () => {
@@ -536,226 +512,183 @@ export function VentesSection() {
       </div>
 
       {/* Section recherche et filtres */}
-      <Tabs value={filterTab} onValueChange={setFilterTab}>
-        <TabsList>
-          <TabsTrigger value="all">Toutes les ventes</TabsTrigger>
-          <TabsTrigger value="regle">Réglées</TabsTrigger>
-          <TabsTrigger value="non_regle">Non réglées</TabsTrigger>
-        </TabsList>
+      <Card className="shadow-[var(--shadow-card)]">
+        <CardContent className="pt-6">
+          <div className="flex gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher une vente..."
+                className="pl-10"
+              />
+            </div>
+            <Button variant="outline">Filtres</Button>
+            <Button variant="outline">Exporter</Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value={filterTab} className="space-y-4 mt-6">
-          <Card className="shadow-[var(--shadow-card)]">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Liste des ventes</CardTitle>
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Rechercher..." className="pl-10" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {currentVentes.length > 0 ? (
-                  <>
-                    {currentVentes.map((v: any) => (
-                      <div key={v.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
-                          <div className="flex items-center gap-3">
-                            {v.photo_url ? (
-                              <img src={v.photo_url} alt={v.nom_produit} className="w-12 h-12 rounded object-cover" />
-                            ) : (
-                              <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                                <Package className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-semibold">{v.reference}</p>
-                              <p className="text-sm text-muted-foreground">{v.nom_produit}</p>
-                            </div>
+      {/* Liste des ventes */}
+      <div className="grid gap-6">
+        {selectVentes && selectVentes.length > 0 ? (
+          <>
+            {currentVentes.map((vente: any) => (
+              <Card key={vente.id} className="shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
+                {/* Détails de la vente */}
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
+                        <ShoppingCart className="h-6 w-6 text-success" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Vente {vente.reference}</CardTitle>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(vente.created_at).toLocaleDateString('fr-FR')}
                           </div>
-
-                          <div>
-                            <p className="text-sm text-muted-foreground">Client</p>
-                            <p className="font-medium">{v.nom_client}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-sm text-muted-foreground">Montant</p>
-                            <p className="font-semibold text-success">{v.prix_total} Fcfa</p>
-                          </div>
-
-                          <div>
-                            <p className="text-sm text-muted-foreground">Statut</p>
-                            <Badge variant={v.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
-                              {v.statut_paiement || 'non réglé'}
-                            </Badge>
-                          </div>
-
-                          <div>
-                            <p className="text-sm text-muted-foreground">Date</p>
-                            <p className="text-sm">{new Date(v.created_at).toLocaleDateString('fr-FR')}</p>
-                          </div>
-
-                          <div className="flex gap-2 justify-end">
-                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {/* <Button variant="outline" size="sm">
-                              <CreditCard className="h-4 w-4" />
-                            </Button> */}
-                            <Button
-                              variant="outline"
-                              size="sm">
-                              {v.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
-                            </Button>
-                            {/* <Button
-                              onClick={() => handleDownloadFacture(v.id)}
-                              size="sm"
-                              variant="outline"><FileText className="h-4 w-4" /> </Button> */}
-                            <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleClick(vente)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                            <DeleteDialog
-                              open={deleteDialogOpen}
-                              openChange={setDeleteDialogOpen}
-                              onConfirm={handleDelete}
-                              itemName={`la commande ${venteDelete?.reference}`}
-                              description="Cela suprrimera toutes les actions liées à cette vente. Cette action est irréversible."
-                              isDeleting={isDeleting}
-                            />
+                          <div className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {vente.nom_client}
                           </div>
                         </div>
                       </div>
-                    ))}
+                    </div>
 
-                    {/* Composant de pagination */}
-                    {totalPages > 1 && (
-                      <Card className="shadow-[var(--shadow-card)]">
-                        <CardContent className="py-4">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm text-muted-foreground">
-                              Affichage de {indexOfFirstItem + 1} à {Math.min(indexOfLastItem, selectVentes.length)} sur {selectVentes.length} ventes
-                            </div>
+                    {/* Badge statut */}
+                    <Badge
+                      variant={
+                        vente.statut === "Payé" ? "default" :
+                          vente.statut === "En attente" ? "secondary" :
+                            "outline"
+                      }
+                      className={
+                        vente.statut === "Payé" ? "bg-success text-success-foreground" :
+                          vente.statut === "En attente" ? "bg-warning text-warning-foreground" : ""
+                      }
+                    >
+                      {vente.statut}
+                    </Badge>
+                  </div>
+                </CardHeader>
 
-                            <div className="flex items-center gap-2">
-                              {/* Bouton Précédent */}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={goToPreviousPage}
-                                disabled={currentPage === 1}
-                              >
-                                <ChevronLeft className="h-4 w-4 mr-1" />
-                                Précédent
-                              </Button>
+                {/* Contenu de la vente */}
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Articles */}
+                    <div>
+                      <h4 className="font-medium mb-2">Article vendu:</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                          <span className="text-sm">
+                            {vente.stock?.achat?.nom_service || 'Produit'} (x{vente.quantite})
+                          </span>
+                          <span className="text-sm font-medium">{vente.prix_total} FCFA</span>
+                        </div>
+                      </div>
+                    </div>
 
-                              {/* Numéros de pages */}
-                              <div className="flex gap-1">
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
-                                  <Button
-                                    key={pageNumber}
-                                    variant={currentPage === pageNumber ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => goToPage(pageNumber)}
-                                    className="w-10"
-                                  >
-                                    {pageNumber}
-                                  </Button>
-                                ))}
-                              </div>
+                    {/* Résumé */}
+                    <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total</p>
+                        <p className="text-xl font-bold text-success">{vente.prix_total} FcFA</p>
+                      </div>
+                    </div>
 
-                              {/* Bouton Suivant */}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={goToNextPage}
-                                disabled={currentPage === totalPages}
-                              >
-                                Suivant
-                                <ChevronRight className="h-4 w-4 ml-1" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </>
-                ) : (
-                  // Affichage si aucune vente
-                  <Card className="shadow-[var(--shadow-card)]">
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                        Aucune vente disponible
-                      </h3>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+                    {/* Boutons modifier et télécharger */}
+                    <div className="flex gap-2 pt-2">
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(vente)}>Modifier</Button>
+                      <Button
+                        onClick={() => handleDownloadFacture(vente.id)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Facture PDF
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleClick(vente)}>Supprimer</Button>
+                      <DeleteDialog
+                        open={deleteDialogOpen}
+                        openChange={setDeleteDialogOpen}
+                        onConfirm={handleDelete}
+                        itemName={`la commande ${venteDelete?.reference}`}
+                        description= "Cela suprrimera toutes les actions liées à cette vente. Cette action est irréversible."
+                        isDeleting={isDeleting}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {/* Composant de pagination */}
+            {totalPages > 1 && (
+              <Card className="shadow-[var(--shadow-card)]">
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      Affichage de {indexOfFirstItem + 1} à {Math.min(indexOfLastItem, selectVentes.length)} sur {selectVentes.length} ventes
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Bouton Précédent */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPreviousPage}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Précédent
+                      </Button>
+
+                      {/* Numéros de pages */}
+                      <div className="flex gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
+                          <Button
+                            key={pageNumber}
+                            variant={currentPage === pageNumber ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => goToPage(pageNumber)}
+                            className="w-10"
+                          >
+                            {pageNumber}
+                          </Button>
+                        ))}
+                      </div>
+
+                      {/* Bouton Suivant */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                      >
+                        Suivant
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        ) : (
+          // Affichage si aucune vente
+          <Card className="shadow-[var(--shadow-card)]">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                Aucune vente disponible
+              </h3>
+              <p className="text-sm text-muted-foreground text-center mb-6">
+                Vous n'avez pas encore effectué de vente. Créez votre première vente pour commencer.
+              </p>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Dialog Détails */}
-      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Détails de la vente</DialogTitle>
-          </DialogHeader>
-          {selectedVente && (
-            <div className="space-y-4">
-              {selectedVente.photo_url ? (
-                <img src={selectedVente.photo_url} alt="Produit" className="w-full h-48 object-cover rounded" />
-              ) : (
-                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                  <Package className="h-16 w-16 text-muted-foreground" />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Référence</p>
-                  <p className="font-semibold">{selectedVente.reference}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Produit</p>
-                  <p className="font-semibold">{selectedVente.nom_produit}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Client</p>
-                  <p className="font-semibold">{selectedVente.nom_client}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Téléphone</p>
-                  <p className="font-semibold">{selectedVente.numero}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Adresse</p>
-                  <p className="font-semibold">{selectedVente.adresse}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Quantité</p>
-                  <p className="font-semibold">{selectedVente.quantite}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Prix total</p>
-                  <p className="font-semibold text-success">{selectedVente.prix_total} Fcfa</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Statut paiement</p>
-                  <Badge variant={selectedVente.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
-                    {selectedVente.statut_paiement || 'non réglé'}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
     </div>
   );
 }

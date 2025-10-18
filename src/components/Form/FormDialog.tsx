@@ -18,6 +18,8 @@ type Props = {
   setPrixVente: (value: string) => void;
   description: string;
   setDescription: (value: string) => void;
+  // photo: string,
+  // setPhoto: (value: string)=>void;
   isSubmitting: boolean;
   handleUpdate: (e: React.FormEvent) => void;
   handleSubmit: (e: React.FormEvent) => void;
@@ -39,6 +41,8 @@ export default function FormDialog({
   setPrixVente,
   description,
   setDescription,
+  // photo,
+  // setPhoto,
   isSubmitting,
   handleUpdate,
   handleSubmit,

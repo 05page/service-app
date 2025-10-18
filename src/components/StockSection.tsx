@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert, ChevronLeft,
-  ChevronRight
+  Image as ImageIcon, Eye
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -41,9 +41,11 @@ export function StockSection() {
   const [prixAchat, setPrixAchat] = useState("");
   const [prixVente, setPrixVente] = useState("");
   const [description, setDescription] = useState("");
-
+  const [photo, setPhoto] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [stockDelete, setStockDelete] = useState<any | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detail, setDetail] = useState<any>(null);
 
   const fetchStock = async () => {
     try {
@@ -116,6 +118,7 @@ export function StockSection() {
     setPrixAchat("");
     setPrixVente("");
     setDescription("");
+    setPhoto("")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -175,6 +178,7 @@ export function StockSection() {
     setQuantiteMin(updateStock.quantite_min?.toString() || "");  // Ajoutez toString()
     setPrixVente(updateStock.prix_vente?.toString() || "");  // Ajoutez toString()
     setDescription(updateStock.description || "");
+    setPhoto(updateStock.photo || "");
     setEditDialogOpen(true);  // Ouvrir le dialog ici
   }
 
@@ -454,6 +458,7 @@ export function StockSection() {
               <TableRow>
                 <TableHead>Article</TableHead>
                 <TableHead>Catégorie</TableHead>
+                <TableHead>Image</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Prix unitaire</TableHead>
                 <TableHead>Prix vente</TableHead>
@@ -475,6 +480,15 @@ export function StockSection() {
                       <Badge variant="outline">{s.categorie || "Non définie"}</Badge>
                     </TableCell>
                     <TableCell>
+                      {s.photo ? (
+                        <img src={photo} className="w-5 h-5 object-cover rounded" />
+                      ) : (
+                        <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="text-sm">
                         <div className="font-medium">{s.quantite} unités</div>
                         <div className="text-muted-foreground text-xs">Min: {s.quantite_min}</div>
@@ -487,6 +501,9 @@ export function StockSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button onClick={() => { setDetail(s); setDetailDialogOpen(true) }} variant="outline" size="sm" title='Détails'>
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button onClick={() => handleEdit(s)} variant="outline" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -538,10 +555,86 @@ export function StockSection() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Détails */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Détails du produit {detail?.code_produit}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="grid gap-6">
+              <div className="flex gap-6">
+                <div className="flex-shrink-0">
+                  {detail.photo ? (
+                    <img src={detail.photo} alt="Produit" className="h-48 w-48 object-cover rounded-lg" />
+                  ) : (
+                    <div className="h-48 w-48 bg-muted rounded-lg flex items-center justify-center">
+                      <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 grid gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Article</p>
+                    <p className="font-medium">{detail.achat?.nom_service}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Code produit</p>
+                    <p className="font-medium">{detail.code_produit}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Catégorie</p>
+                    <Badge variant="outline">{detail.categorie}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Quantité</p>
+                      <p className="font-medium">{detail.quantite} unités</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Quantité min</p>
+                      <p className="font-medium">{detail.quantite_min} unités</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Prix d'achat unitaire</p>
+                  <p className="font-medium">{detail.achat?.prix_unitaire?.toLocaleString() || 0} Fcfa</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Prix de vente</p>
+                  <p className="text-2xl font-bold">{detail.prix_vente?.toLocaleString()} Fcfa</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Statut</p>
+                  <Badge variant={getStatutColor(detail.statut)}>
+                    {getStatutLabel(detail.statut)}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Valeur totale</p>
+                  <p className="font-medium">
+                    {((detail.quantite || 0) * (detail.prix_vente || 0)).toLocaleString()} Fcfa
+                  </p>
+                </div>
+              </div>
+              {detail.description && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Description</p>
+                  <p className="text-sm">{detail.description}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
