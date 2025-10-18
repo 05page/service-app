@@ -12,8 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Plus, Search, Edit, Trash2, Phone, Mail, User, Calendar, RefreshCw, Power, PowerOff, ChevronLeft,
-  ChevronRight,
-  CalendarHeart
+  ChevronRight, TrendingUp, CreditCard, Package
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePagination } from "../hooks/usePagination";
@@ -448,6 +447,48 @@ export function PersonnelSection() {
         </Card>
       </div>
 
+      {/* Statistiques de commissions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-primary/5 to-primary/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Taux de commission</CardTitle>
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">
+              {statsPersonnel?.taux_commission || 5}%
+            </div>
+            <p className="text-xs text-muted-foreground">Sur ventes réglées</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-success/5 to-success/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Commissions payées</CardTitle>
+            <CreditCard className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">
+              {statsPersonnel?.commissions_payees ? parseFloat(statsPersonnel.commissions_payees).toLocaleString('fr-FR') : 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">Commissions versées</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-warning/5 to-warning/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Commissions en attente</CardTitle>
+            <Package className="h-4 w-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-warning">
+              {statsPersonnel?.commissions_en_attente ? parseFloat(statsPersonnel.commissions_en_attente).toLocaleString('fr-FR') : 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">Ventes non soldées</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Tabs value={filterTab} onValueChange={setFilterTab}>
         <TabsList>
           <TabsTrigger value="all">Tous les employés</TabsTrigger>
@@ -467,109 +508,129 @@ export function PersonnelSection() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {filterPersonnals.length > 0 ? (
-                  <>
-                    {filterPersonnals.map((employe: any) => {
-                      // AJOUT DU RETURN ICI
-                      return (
-                        <div key={employe.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div>
-                            <div className="flex items-center space-x-3">
-                              <Avatar>
-                                <AvatarImage src="" />
-                                <AvatarFallback>{getInitials(employe.fullname)}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="font-medium">{employe.fullname}</div>
-                                <div className="text-sm text-muted-foreground flex items-center">
-                                  <Calendar className="h-3 w-3 mr-1" />
-                                  Depuis {new Date(employe.created_at).toLocaleDateString('fr-FR')}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-1">
-                              <div className="flex items-center text-sm">
-                                <Mail className="h-3 w-3 mr-1" />
-                                {employe.email}
-                              </div>
-                              <div className="flex items-center text-sm">
-                                <Phone className="h-3 w-3 mr-1" />
-                                {employe.telephone}
-                              </div>
-                            </div>
-
-                            <Badge variant={getStatutColor(employe.active)}>
-                              {employe.active ? "Actif" : "Inactif"}
-                            </Badge>
-
-                            <div className="flex space-x-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEdit(employe)}
-                                title="Modifier"
-                                className="h-8 w-8 p-0"
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleClick(employe)}
-                                title="Supprimer"
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                              <DeleteDialog
-                                open={deleteDialogOpen}
-                                openChange={setDeleteDialogOpen}
-                                onConfirm={handleDelete}
-                                itemName={`la commande ${personnelDelete?.fullname}`}
-                                description="Cela supprimera toutes les actions liés à cet employé. Cette action est irréversible."
-                                isDeleting={isDeleting}
-                              />
-                              {employe.active ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleToggleStatus(employe.id, employe.active)}
-                                  title="Désactiver"
-                                  className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
-                                >
-                                  <PowerOff className="h-3 w-3" />
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleToggleStatus(employe.id, employe.active)}
-                                  title="Activer"
-                                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
-                                >
-                                  <Power className="h-3 w-3" />
-                                </Button>
-                              )}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Personnel</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Rôle</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Depuis</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filterPersonnals.length > 0 ? (
+                    filterPersonnals.map((employe: any) => (
+                      <TableRow key={employe.id} className="hover:bg-muted/50">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src="" />
+                              <AvatarFallback>{getInitials(employe.fullname)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{employe.fullname}</p>
+                              <p className="text-sm text-muted-foreground">{employe.adresse}</p>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                ) : (
-                  <div className="text-center py-12">
-                    <User className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
-                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                      Aucun employé disponible
-                    </h3>
-                    <p className="text-sm text-muted-foreground text-center mb-6">
-                      Vous n'avez pas encore d'employé dans votre équipe. Ajoutez votre premier employé pour commencer.
-                    </p>
-                  </div>
-                )}
-              </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center text-sm">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {employe.email}
+                            </div>
+                            <div className="flex items-center text-sm">
+                              <Phone className="h-3 w-3 mr-1" />
+                              {employe.telephone}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {employe.role || 'Employé'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatutColor(employe.active)}>
+                            {employe.active ? "Actif" : "Inactif"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(employe.created_at).toLocaleDateString('fr-FR')}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(employe)}
+                              title="Modifier"
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleClick(employe)}
+                              title="Supprimer"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                            {employe.active ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToggleStatus(employe.id, employe.active)}
+                                title="Désactiver"
+                                className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
+                              >
+                                <PowerOff className="h-3 w-3" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToggleStatus(employe.id, employe.active)}
+                                title="Activer"
+                                className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
+                              >
+                                <Power className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-12">
+                        <User className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
+                        <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                          Aucun employé disponible
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Vous n'avez pas encore d'employé dans votre équipe. Ajoutez votre premier employé pour commencer.
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <DeleteDialog
+                open={deleteDialogOpen}
+                openChange={setDeleteDialogOpen}
+                onConfirm={handleDelete}
+                itemName={`la commande ${personnelDelete?.fullname}`}
+                description="Cela supprimera toutes les actions liés à cet employé. Cette action est irréversible."
+                isDeleting={isDeleting}
+              />
             </CardContent>
           </Card>
         </TabsContent>

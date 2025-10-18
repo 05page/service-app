@@ -538,47 +538,6 @@ export function VentesSection() {
         </Card>
       </div>
 
-      {/* Statistiques de commissions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-primary/5 to-primary/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Taux de commission</CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {vente?.taux_commission || 5}%
-            </div>
-            <p className="text-xs text-muted-foreground">Sur ventes réglées</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-success/5 to-success/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Commissions payées</CardTitle>
-            <CreditCard className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              {vente?.commissions_payees ? parseFloat(vente.commissions_payees).toLocaleString('fr-FR') : 0} Fcfa
-            </div>
-            <p className="text-xs text-muted-foreground">Commissions versées</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-[var(--shadow-card)] bg-gradient-to-br from-warning/5 to-warning/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Commissions en attente</CardTitle>
-            <Package className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">
-              {vente?.commissions_en_attente ? parseFloat(vente.commissions_en_attente).toLocaleString('fr-FR') : 0} Fcfa
-            </div>
-            <p className="text-xs text-muted-foreground">Ventes non soldées</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Section recherche et filtres */}
       <Tabs value={filterTab} onValueChange={setFilterTab} className="w-full">
@@ -613,7 +572,7 @@ export function VentesSection() {
                   <>
                     {currentVentes.map((v: any) => (
                       <div key={v.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                        <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
                           <div className="flex items-center gap-3">
                             {v.photo_url ? (
                               <img src={v.photo_url} alt={v.nom_produit} className="w-12 h-12 rounded object-cover" />
@@ -631,6 +590,17 @@ export function VentesSection() {
                           <div>
                             <p className="text-sm text-muted-foreground">Client</p>
                             <p className="font-medium">{v.nom_client}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-sm text-muted-foreground">Personnel</p>
+                            <p className="font-medium">{v.employe_nom || 'N/A'}</p>
+                            <Badge variant="outline" className="text-xs mt-1">
+                              {v.employe_role || 'employé'}
+                            </Badge>
+                            {v.commission_touche && (
+                              <p className="text-xs text-success mt-1">✓ Commissionné</p>
+                            )}
                           </div>
 
                           <div>
@@ -654,22 +624,15 @@ export function VentesSection() {
                             <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {/* <Button variant="outline" size="sm">
-                              <CreditCard className="h-4 w-4" />
-                            </Button> */}
                             <Button
                               variant="outline"
                               size="sm">
                               {v.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
                             </Button>
-                            {/* <Button
-                              onClick={() => handleDownloadFacture(v.id)}
-                              size="sm"
-                              variant="outline"><FileText className="h-4 w-4" /> </Button> */}
                             <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleClick(vente)}>
+                            <Button size="sm" variant="outline" onClick={() => handleClick(v)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                             <DeleteDialog
@@ -803,6 +766,30 @@ export function VentesSection() {
                   <Badge variant={selectedVente.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
                     {selectedVente.statut_paiement || 'non réglé'}
                   </Badge>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-sm text-muted-foreground mb-2">Personnel</p>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">{selectedVente.employe_nom || 'N/A'}</p>
+                        <Badge variant="outline" className="mt-1">
+                          {selectedVente.employe_role || 'employé'}
+                        </Badge>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Commission</p>
+                        <p className="font-semibold text-primary">
+                          {selectedVente.commission_montant ? `${selectedVente.commission_montant} Fcfa` : 'N/A'}
+                        </p>
+                        {selectedVente.commission_touche && (
+                          <Badge variant="default" className="mt-1">
+                            ✓ Commissionné
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
