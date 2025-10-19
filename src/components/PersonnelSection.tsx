@@ -514,6 +514,8 @@ export function PersonnelSection() {
                     <TableHead>Personnel</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Rôle</TableHead>
+                    <TableHead>Commission Due</TableHead>
+                    <TableHead>Statut Commission</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead>Depuis</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -550,6 +552,16 @@ export function PersonnelSection() {
                         <TableCell>
                           <Badge variant="outline">
                             {employe.role || 'Employé'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-semibold text-primary">
+                            {employe.commission_due ? parseFloat(employe.commission_due).toLocaleString('fr-FR') : 0} Fcfa
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={employe.commission_reversee ? "default" : "secondary"}>
+                            {employe.commission_reversee ? "Reversée" : "En attente"}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -610,7 +622,7 @@ export function PersonnelSection() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12">
+                      <TableCell colSpan={8} className="text-center py-12">
                         <User className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
                         <h3 className="text-lg font-semibold text-muted-foreground mb-2">
                           Aucun employé disponible
