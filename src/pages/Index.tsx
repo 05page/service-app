@@ -16,6 +16,8 @@ import { AchatsSection } from "@/components/AchatsSection";
 import { StockSection } from "@/components/StockSection";
 import { ProfileSection } from "@/components/ProfileSection";
 import { CommissionsSection } from "@/components/CommissionsSection";
+import { CommissionEmployeeSection } from "@/components/CommissionEmployeeSection";
+import { MouvementsStockSection } from "@/components/MouvementsStockSection";
 import { SettingsSection } from "@/components/SettingsSection";
 import { UserRole } from "./Auth";
 
@@ -74,8 +76,15 @@ const Index = () => {
         return userRole === "admin" || userRole === "employe" ? <AchatsSection /> : renderDashboard();
       case "stock":
         return userRole === "admin" || userRole === "employe" ? <StockSection /> : renderDashboard();
+      case "mouvements-stock":
+        return userRole === "admin" || userRole === "employe" ? <MouvementsStockSection /> : renderDashboard();
       case "commissions":
-        return userRole === "admin" ? <CommissionsSection /> : renderDashboard();
+        if (userRole === "admin") {
+          return <CommissionsSection />;
+        } else if (userRole === "employe") {
+          return <CommissionEmployeeSection />;
+        }
+        return renderDashboard();
       case "profile":
         return userRole === "admin" || userRole === "employe" ? <ProfileSection userRole={userRole} /> : renderDashboard();
       case "settings":
