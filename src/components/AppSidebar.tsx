@@ -38,7 +38,6 @@ export function AppSidebar({ activeSection, onSectionChange, userRole }: Sidebar
         { id: "fournisseurs", label: "Fournisseurs", icon: Package },
         { id: "achats", label: "Achats", icon: TrendingUp },
         { id: "stock", label: "Stock", icon: Package },
-        { id: "mouvements-stock", label: "Mouvements Stock", icon: TrendingUp },
         { id: "profile", label: "Mon Profil", icon: User },
         { id: "commissions", label: "Commissions", icon: Wallet },
         // { id: "settings", label: "Paramètres", icon: Settings },
@@ -52,7 +51,6 @@ export function AppSidebar({ activeSection, onSectionChange, userRole }: Sidebar
         { id: "ventes", label: "Ventes", icon: ShoppingCart },
         { id: "achats", label: "Achats", icon: TrendingUp },
         { id: "stock", label: "Stock", icon: Package },
-        { id: "mouvements-stock", label: "Mouvements Stock", icon: TrendingUp },
         { id: "commissions", label: "Mes Commissions", icon: Wallet },
         { id: "profile", label: "Mon Profil", icon: User },
       ];

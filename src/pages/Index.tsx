@@ -17,7 +17,6 @@ import { StockSection } from "@/components/StockSection";
 import { ProfileSection } from "@/components/ProfileSection";
 import { CommissionsSection } from "@/components/CommissionsSection";
 import { CommissionEmployeeSection } from "@/components/CommissionEmployeeSection";
-import { MouvementsStockSection } from "@/components/MouvementsStockSection";
 import { SettingsSection } from "@/components/SettingsSection";
 import { UserRole } from "./Auth";
 
@@ -76,8 +75,6 @@ const Index = () => {
         return userRole === "admin" || userRole === "employe" ? <AchatsSection /> : renderDashboard();
       case "stock":
         return userRole === "admin" || userRole === "employe" ? <StockSection /> : renderDashboard();
-      case "mouvements-stock":
-        return userRole === "admin" || userRole === "employe" ? <MouvementsStockSection /> : renderDashboard();
       case "commissions":
         if (userRole === "admin") {
           return <CommissionsSection />;

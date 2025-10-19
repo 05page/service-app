@@ -9,8 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert, ChevronLeft,
-  Image as ImageIcon, Eye
+  Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert, 
+  Image as ImageIcon, Eye, TrendingUp, PackagePlus, PackageMinus
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ export function StockSection() {
   const [selectUpdateStock, setSelecUpdatetStock] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [achatId, setAchatId] = useState<any[]>([]);
+  const [mouvements, setMouvements] = useState<any[]>([]);
 
   //Formulaire
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,6 +91,10 @@ export function StockSection() {
     try {
       const response = await api.get('/stock/');
       setSelectStock(response.data.data);
+      
+      // Récupérer aussi les mouvements de stock
+      const mouvementsRes = await api.get('/stock/mouvements');
+      setMouvements(mouvementsRes.data.data || []);
     } catch (error) {
       console.error('Erreur survenue lors de la récupération', error);
     } finally {
@@ -285,6 +290,28 @@ export function StockSection() {
   const { currentPage, totalPages, currentData: currentStock, setCurrentPage } =
     usePagination({ data: filteredStock, itemsPerPage: 8 });
 
+  // Calculer les entrées et sorties par article
+  const getEntreesSorties = (stockId: number) => {
+    const entrees = mouvements
+      .filter((m: any) => m.stock_id === stockId && (m.type_mouvement === 'achat' || m.type_mouvement === 'renouvellement'))
+      .reduce((acc: number, m: any) => acc + parseInt(m.quantite || 0), 0);
+    
+    const sorties = mouvements
+      .filter((m: any) => m.stock_id === stockId && m.type_mouvement === 'vente')
+      .reduce((acc: number, m: any) => acc + parseInt(m.quantite || 0), 0);
+    
+    return { entrees, sorties };
+  };
+
+  // Calculer les stats globales
+  const totalEntrees = mouvements
+    .filter((m: any) => m.type_mouvement === 'achat' || m.type_mouvement === 'renouvellement')
+    .reduce((acc: number, m: any) => acc + parseInt(m.quantite || 0), 0);
+
+  const totalSorties = mouvements
+    .filter((m: any) => m.type_mouvement === 'vente')
+    .reduce((acc: number, m: any) => acc + parseInt(m.quantite || 0), 0);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -382,7 +409,7 @@ export function StockSection() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Articles</CardTitle>
@@ -417,6 +444,24 @@ export function StockSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stock?.total_valeur_stock?.toLocaleString() || 0} Fcfa</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Entrées</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{totalEntrees}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Sorties</CardTitle>
+            <PackageMinus className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{totalSorties}</div>
           </CardContent>
         </Card>
       </div>
@@ -460,6 +505,8 @@ export function StockSection() {
                 <TableHead>Catégorie</TableHead>
                 <TableHead>Image</TableHead>
                 <TableHead>Stock</TableHead>
+                <TableHead>Entrées</TableHead>
+                <TableHead>Sorties</TableHead>
                 <TableHead>Prix unitaire</TableHead>
                 <TableHead>Prix vente</TableHead>
                 <TableHead>Statut</TableHead>
@@ -468,55 +515,70 @@ export function StockSection() {
             </TableHeader>
             <TableBody>
               {currentStock.length > 0 ? (
-                currentStock.map((s: any) => (
-                  <TableRow key={s.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{s.achat?.nom_service}</div>
-                        <div className="text-sm text-muted-foreground">{s.code_produit}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{s.categorie || "Non définie"}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {s.photo ? (
-                        <img src={photo} className="w-5 h-5 object-cover rounded" />
-                      ) : (
-                        <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
-                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                currentStock.map((s: any) => {
+                  const { entrees, sorties } = getEntreesSorties(s.id);
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{s.achat?.nom_service}</div>
+                          <div className="text-sm text-muted-foreground">{s.code_produit}</div>
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="font-medium">{s.quantite} unités</div>
-                        <div className="text-muted-foreground text-xs">Min: {s.quantite_min}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{s.achat?.prix_unitaire || 0} Fcfa</TableCell>
-                    <TableCell>{s.prix_vente} Fcfa</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatutColor(s.statut)}>{getStatutLabel(s.statut)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button onClick={() => { setDetail(s); setDetailDialogOpen(true) }} variant="outline" size="sm" title='Détails'>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={() => handleEdit(s)} variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={() => handleDeleteClick(s)} variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{s.categorie || "Non définie"}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {s.photo ? (
+                          <img src={photo} className="w-5 h-5 object-cover rounded" />
+                        ) : (
+                          <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div className="font-medium">{s.quantite} unités</div>
+                          <div className="text-muted-foreground text-xs">Min: {s.quantite_min}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <PackagePlus className="h-3 w-3 mr-1" />
+                          {entrees}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          <PackageMinus className="h-3 w-3 mr-1" />
+                          {sorties}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{s.achat?.prix_unitaire || 0} Fcfa</TableCell>
+                      <TableCell>{s.prix_vente} Fcfa</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatutColor(s.statut)}>{getStatutLabel(s.statut)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button onClick={() => { setDetail(s); setDetailDialogOpen(true) }} variant="outline" size="sm" title='Détails'>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button onClick={() => handleEdit(s)} variant="outline" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button onClick={() => handleDeleteClick(s)} variant="outline" size="sm">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-[400px]">
+                  <TableCell colSpan={10} className="h-[400px]">
                     <div className="flex flex-col items-center justify-center">
                       <Package className="h-16 w-16 text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold text-muted-foreground mb-2">Aucun article en stock</h3>
