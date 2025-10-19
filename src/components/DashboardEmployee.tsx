@@ -12,19 +12,22 @@ import {
   ClipboardList,
   Phone,
   RefreshCw,
-  Plus,
-  UserPlus
+  Wallet,
+  DollarSign
 } from "lucide-react";
 
 import { toast } from 'sonner';
 
 // Définition du type VentesStats pour typer les statistiques de ventes
 type VentesStats = {
-  total_ventes: number,       // Total des ventes effectuées
-  vente_en_attente: number,   // Ventes en attente de paiement
-  ventes_paye: number,        // Ventes payées
-  ventes_annule: number,      // Ventes annulées
-  mes_clients: number         // Nombre de clients
+  total_ventes: number,
+  vente_en_attente: number,
+  ventes_paye: number,
+  ventes_annule: number,
+  mes_clients: number,
+  total_commissions: number,
+  commissions_reversees: number,
+  commissions_en_attente: number
 }
 
 // Composant principal DashboardEmployee
@@ -135,7 +138,7 @@ export const DashboardEmployee = () => {
       </div>
 
       {/* Statistiques principales de l'employé */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
 
         {/* Carte : Mes ventes ce mois */}
         <Card className="border-border bg-card">
@@ -147,7 +150,7 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-card-foreground">
-              {myStats?.total_ventes || 0} {/* Affiche 0 si aucune vente */}
+              {myStats?.total_ventes || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Total des ventes effectuées
@@ -165,7 +168,7 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-card-foreground">
-              {myStats?.mes_clients || 0} {/* Affiche 0 si aucun client */}
+              {myStats?.mes_clients || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Clients dans mon portefeuille
@@ -183,7 +186,7 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {myStats?.ventes_paye || 0} {/* Affiche 0 si aucune vente payée */}
+              {myStats?.ventes_paye || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Ventes confirmées et payées
@@ -201,10 +204,65 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {myStats?.vente_en_attente || 0} {/* Affiche 0 si aucune vente en attente */}
+              {myStats?.vente_en_attente || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Ventes en attente de paiement
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Carte : Mes commissions totales */}
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-card-foreground">
+              Mes commissions
+            </CardTitle>
+            <Wallet className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">
+              {myStats?.total_commissions?.toLocaleString() || 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Total gagné
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Stats commissions détaillées */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-card-foreground">
+              Commissions reversées
+            </CardTitle>
+            <Wallet className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {myStats?.commissions_reversees?.toLocaleString() || 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Déjà reçues
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-card-foreground">
+              Commissions en attente
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {myStats?.commissions_en_attente?.toLocaleString() || 0} Fcfa
+            </div>
+            <p className="text-xs text-muted-foreground">
+              À recevoir
             </p>
           </CardContent>
         </Card>

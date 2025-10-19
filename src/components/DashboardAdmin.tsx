@@ -12,7 +12,10 @@ import {
   UserCheck,
   Building,
   RefreshCw,
-  ClipboardList
+  ClipboardList,
+  Wallet,
+  PackagePlus,
+  PackageMinus
 } from "lucide-react";
 import { toast } from 'sonner';
 
@@ -24,16 +27,19 @@ type Stats = {
   total_employe_inactifs: number;
   total_personnels: number;
   total_fournisseurs: number;
-  // total_fournisseurs_inactif: number;
-  // nouveaux_fournisseurs_mois: number;
   total_produits_stock: number;
   chiffres_affaire_total: number;
-  total_ventes: number
+  total_ventes: number;
+  total_stock_faible: number;
+  total_commissions_dues: number;
+  total_commissions_reversees: number;
+  total_entrees_stock: number;
+  total_sorties_stock: number;
 };
 
 export const DashboardAdmin = () => {
   const [refreshing, setRefreshing] = useState(false)
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true)
 
 
@@ -144,10 +150,7 @@ export const DashboardAdmin = () => {
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">{stats?.chiffres_affaire_total}</div>
-            {/* <p className="text-xs text-muted-foreground">
-              +12.5% par rapport au mois dernier
-            </p> */}
+            <div className="text-2xl font-bold text-card-foreground">{stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa</div>
           </CardContent>
         </Card>
 
@@ -159,10 +162,7 @@ export const DashboardAdmin = () => {
             <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">{stats?.total_client}</div>
-            {/* <p className="text-xs text-muted-foreground">
-              +8.2% par rapport au mois dernier
-            </p> */}
+            <div className="text-2xl font-bold text-card-foreground">{stats?.total_client || 0}</div>
           </CardContent>
         </Card>
 
@@ -174,27 +174,87 @@ export const DashboardAdmin = () => {
             <ShoppingCart className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">{stats?.total_ventes}</div>
-            {/* <p className="text-xs text-muted-foreground">
-              +15.3% par rapport au mois dernier
-            </p> */}
+            <div className="text-2xl font-bold text-card-foreground">{stats?.total_ventes || 0}</div>
           </CardContent>
         </Card>
 
-        {/* <Card className="border-border bg-card">
+        <Card className="border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
-              Commissions à payer
+              Commissions dues
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
+            <Wallet className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">8,450 €</div>
+            <div className="text-2xl font-bold text-orange-600">{stats?.total_commissions_dues?.toLocaleString() || 0} Fcfa</div>
             <p className="text-xs text-muted-foreground">
-              Pour ce mois
+              À reverser
             </p>
           </CardContent>
-        </Card> */}
+        </Card>
+      </div>
+
+      {/* Stats stock et commissions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-card-foreground">
+              Entrées Stock
+            </CardTitle>
+            <PackagePlus className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats?.total_entrees_stock || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Articles ajoutés
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-card-foreground">
+              Sorties Stock
+            </CardTitle>
+            <PackageMinus className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats?.total_sorties_stock || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Articles vendus
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-card-foreground">
+              Commissions reversées
+            </CardTitle>
+            <Wallet className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats?.total_commissions_reversees?.toLocaleString() || 0} Fcfa</div>
+            <p className="text-xs text-muted-foreground">
+              Déjà payées
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-card-foreground">
+              Stock faible
+            </CardTitle>
+            <Package className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{stats?.total_stock_faible || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Nécessite réapprovisionnement
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Sections de gestion */}
