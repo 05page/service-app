@@ -70,6 +70,8 @@ export function VentesSection() {
   const [prixUnitaire, setPrixUnitaire] = useState(""); // Prix unitaire
   const [prixTotal, setPrixTotal] = useState(""); // Prix total calculé automatiquement
   const [photo, setPhoto] = useState("");
+  const [intermediaire, setIntemediaire] = useState("");
+  const [montant, setMontant] = useState("");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   // États pour la pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -109,8 +111,8 @@ export function VentesSection() {
   const selectVente = async () => {
     try {
       const response = await api.get('/ventes/');
-      setSelectVentes(response.data.data || [])
-      console.log("Liste des ventes", response.data.data)
+      setSelectVentes(response.data.data || []);
+      console.log("Liste des ventes", response.data.data);
     } catch (error: any) {
       console.error('Erreur survenue lors de la récupération des ventes', error);
       if (error.response?.status === 403) {
@@ -155,6 +157,8 @@ export function VentesSection() {
         numero,
         adresse,
         quantite: parseInt(quantite),
+        intermediaire,
+        montant
       });
 
       toast.success(response.data.message || 'Vente créée avec succès');
@@ -329,7 +333,7 @@ export function VentesSection() {
     }
   }, [stockId, stock]);
 
-    // Filtrer les ventes selon le statut
+  // Filtrer les ventes selon le statut
   const filteredVentes = selectVentes.filter((v: any) => {
     if (filterTab === "all") return true;
     if (filterTab === "regle") return v.statut_paiement === "réglé";
@@ -431,12 +435,16 @@ export function VentesSection() {
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
+                intermediaire={intermediaire}
+                setIntermediaire={setIntemediaire}
                 quantite={quantite}
                 setQuantite={setQuantite}
                 prixUnitaire={prixUnitaire}
                 setPrixUnitaire={setPrixUnitaire}
                 prixTotal={prixTotal}
                 setPrixTotal={setPrixTotal}
+                montant={montant}
+                setMontant={setMontant}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -465,12 +473,16 @@ export function VentesSection() {
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
+                intermediaire={intermediaire}
+                setIntermediaire={setIntemediaire}
                 quantite={quantite}
                 setQuantite={setQuantite}
                 prixUnitaire={prixUnitaire}
                 setPrixUnitaire={setPrixUnitaire}
                 prixTotal={prixTotal}
                 setPrixTotal={setPrixTotal}
+                montant={montant}
+                setMontant={setMontant}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -624,11 +636,6 @@ export function VentesSection() {
                         <div className="flex gap-2 justify-end border-t pt-3 mt-3">
                           <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
                             <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm">
-                            {v.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
                             <Edit className="h-4 w-4" />
@@ -792,6 +799,12 @@ export function VentesSection() {
                   </div>
                 </div>
               </div>
+
+              <Button
+                variant="outline"
+                size="sm">
+                {selectedVente.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+              </Button>
             </div>
           )}
         </DialogContent>

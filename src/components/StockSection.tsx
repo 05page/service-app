@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert, 
+  Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert,
   Image as ImageIcon, Eye, TrendingUp, PackagePlus, PackageMinus
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -91,7 +91,7 @@ export function StockSection() {
     try {
       const response = await api.get('/stock/');
       setSelectStock(response.data.data);
-      
+
       // Récupérer aussi les mouvements de stock
       const mouvementsRes = await api.get('/stock/mouvements');
       setMouvements(mouvementsRes.data.data || []);
@@ -295,11 +295,11 @@ export function StockSection() {
     const entrees = mouvements
       .filter((m: any) => m.stock_id === stockId && (m.type_mouvement === 'achat' || m.type_mouvement === 'renouvellement'))
       .reduce((acc: number, m: any) => acc + parseInt(m.quantite || 0), 0);
-    
+
     const sorties = mouvements
       .filter((m: any) => m.stock_id === stockId && m.type_mouvement === 'vente')
       .reduce((acc: number, m: any) => acc + parseInt(m.quantite || 0), 0);
-    
+
     return { entrees, sorties };
   };
 
@@ -439,15 +439,6 @@ export function StockSection() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valeur Stock</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stock?.total_valeur_stock?.toLocaleString() || 0} Fcfa</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Entrées</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
@@ -462,6 +453,15 @@ export function StockSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{totalSorties}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Valeur Stock</CardTitle>
+            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stock?.total_valeur_stock?.toLocaleString() || 0} Fcfa</div>
           </CardContent>
         </Card>
       </div>

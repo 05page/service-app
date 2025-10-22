@@ -18,10 +18,14 @@ type Props = {
     setAdresse: (value: string) => void;
     quantite?: string;
     setQuantite: (value: string) => void;
+    intermediaire?: string;
+    setIntermediaire: (value: string) => void;
     prixUnitaire?: string;
     setPrixUnitaire: (value: string) => void;
     prixTotal?: string;
     setPrixTotal: (value: string) => void;
+    montant: string;
+    setMontant:(value: string) => void;
     setDialogOpen: (open: boolean) => void;
     isSubmitting: boolean;
     handleSubmit: (e: React.FormEvent) => void;
@@ -42,11 +46,15 @@ export default function FormVente({
     setNumero,
     adresse,
     setAdresse,
+    intermediaire,
+    setIntermediaire,
     quantite,
     setQuantite,
     prixUnitaire,
     setPrixUnitaire,
     prixTotal,
+    montant,
+    setMontant,
     isSubmitting,
     setDialogOpen,
     setEditDialogOpen,
@@ -132,6 +140,19 @@ export default function FormVente({
                         />
                     </div>
 
+                    <div className="space-y-2">
+                        <Label>Intermediaire</Label>
+                        <Select>
+                            <SelectTrigger>
+                                <SelectValue  placeholder="Sélectionner l'intermédiaire"/>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="JD">Dibi Jean David</SelectItem>
+                                <SelectItem value="Loukou Landry">Loukou Landry</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     {/* Champ Quantité */}
                     <div className="space-y-2">
                         <Label htmlFor="quantite">Quantité *</Label>
@@ -181,6 +202,17 @@ export default function FormVente({
                         <p className="text-xs text-muted-foreground">
                             Prix automatiquement rempli selon la quantité sélectionnée
                         </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Montant</Label>
+                        <Input 
+                        type="number"
+                        placeholder="Entrez le montant"
+                        id="montant"
+                        value={montant}
+                        onChange={(e)=> setMontant(e.target.value)}
+                        />
                     </div>
                 </div>
 

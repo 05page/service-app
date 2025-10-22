@@ -37,6 +37,8 @@ export function PersonnelSection() {
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
+  const [role, setRole] = useState("");
+  const [tauxComission, setTauxComission] = useState("");
 
   // Dans votre composant
   const { currentPage, totalPages, currentData, setCurrentPage } =
@@ -83,7 +85,7 @@ export function PersonnelSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullname || !email || !telephone || !adresse) {
+    if (!fullname || !email || !telephone || !adresse || !role) {
       toast.error('Veuillez remplir tous les champs');
       return;
     }
@@ -93,7 +95,9 @@ export function PersonnelSection() {
         fullname,
         email,
         telephone,
-        adresse
+        adresse,
+        role,
+        tauxComission
       });
 
       toast.success(response.data.message);
@@ -305,6 +309,31 @@ export function PersonnelSection() {
                       value={adresse}
                       onChange={(e) => setAdresse(e.target.value)}
                       placeholder="Yopougon"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Role *</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner le role du personnel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="employé">Employé</SelectItem>
+                        <SelectItem value="intermediaire">Intermediaire</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="comission">Taux de comission</Label>
+                    <Input
+                      id="tauxComission"
+                      type="number"
+                      placeholder="Entrez le taux de comission"
+                      value={tauxComission}
+                      onChange={(e) => setTauxComission(e.target.value)}
                       required
                     />
                   </div>
