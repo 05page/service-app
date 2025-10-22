@@ -237,10 +237,9 @@ export function VentesSection() {
     }
   }
 
-  // Téléchargement de la facture PDF pour une vente
-  const handleDownloadFacture = async (venteId: string) => {
+  const handleDownloadFacture = async (venteId: string, isRecu: boolean = false) => {
     try {
-      toast.info('Génération de facture en cours...');
+      toast.info(`Génération ${isRecu ? 'du reçu' : 'de la facture'} en cours...`);
 
       const response = await api.get(`factures/vente/${venteId}/pdf`, {
         responseType: 'blob'
@@ -251,7 +250,7 @@ export function VentesSection() {
 
       const link = document.createElement('a');
       link.href = url;
-      link.download = `facture-${venteId}.pdf`;
+      link.download = `${isRecu ? 'recu' : 'facture'}-${venteId}.pdf`;
       document.body.appendChild(link);
       link.click();
 
@@ -259,19 +258,19 @@ export function VentesSection() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast.success('Facture téléchargée avec succès');
+      toast.success(`${isRecu ? 'Reçu' : 'Facture'} téléchargé avec succès`);
     } catch (error: any) {
       if (error.response?.data instanceof Blob) {
         const text = await error.response.data.text();
         console.error("Réponse brute:", text);
         try {
           const errorData = JSON.parse(text);
-          toast.error(errorData.message || 'Erreur lors de la génération de la facture');
+          toast.error(errorData.message || 'Erreur lors de la génération');
         } catch {
-          toast.error('Erreur lors de la génération de la facture');
+          toast.error('Erreur lors de la génération');
         }
       } else {
-        toast.error(error.response?.data?.message || 'Erreur lors du téléchargement de la facture');
+        toast.error(error.response?.data?.message || 'Erreur lors du téléchargement');
       }
     }
   }
@@ -615,14 +614,18 @@ export function VentesSection() {
                       </div>
                     </div>
 
-                    {/* Boutons modifier et télécharger */}
+                    {/* Boutons d'actions */}
                     <div className="flex gap-2 pt-2">
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(vente)}>Modifier</Button>
-                      <Button size="sm" variant="outline" onClick={() => {
-                        setSelectedVente(vente);
-                        setDetailDialogOpen(true);
-                      }}>Voir détails</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleClick(vente)}>Supprimer</Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => {
+                          setSelectedVente(vente);
+                          setDetailDialogOpen(true);
+                        }}
+                      >
+                        Voir détails
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -696,6 +699,145 @@ export function VentesSection() {
           </Card>
         )}
       </div>
+
+      {/* Dialog de confirmation de suppression */}
+      <DeleteDialog
+        open={deleteDialogOpen}
+        openChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        itemName={`la vente ${venteDelete?.reference}`}
+        description="Cela supprimera toutes les actions liées à cette vente. Cette action est irréversible."
+        isDeleting={isDeleting}
+      />
+
+      {/* Dialog Détails avec actions */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Détails de la vente</DialogTitle>
+          </DialogHeader>
+          {selectedVente && (
+            <div className="space-y-6">
+              {selectedVente.photo_url && (
+                <div className="relative w-full h-48 rounded-lg overflow-hidden bg-muted">
+                  <img src={selectedVente.photo_url} alt="Produit" className="w-full h-full object-cover" />
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">Référence</p>
+                  <p className="font-semibold">{selectedVente.reference}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Produit</p>
+                  <p className="font-semibold">{selectedVente.stock?.achat?.nom_service || 'Produit'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Client</p>
+                  <p className="font-semibold">{selectedVente.nom_client}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Téléphone</p>
+                  <p className="font-semibold">{selectedVente.numero}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Adresse</p>
+                  <p className="font-semibold">{selectedVente.adresse}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Quantité</p>
+                  <p className="font-semibold">{selectedVente.quantite}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Prix total</p>
+                  <p className="font-semibold text-success text-lg">{selectedVente.prix_total} Fcfa</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Statut</p>
+                  <Badge variant={selectedVente.statut === 'Payé' ? 'default' : 'destructive'} className="mt-1">
+                    {selectedVente.statut || 'En attente'}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date de vente</p>
+                  <p className="font-semibold">{new Date(selectedVente.created_at).toLocaleDateString('fr-FR')}</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Actions disponibles</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant="outline" className="justify-start" onClick={() => {
+                    setDetailDialogOpen(false);
+                    handleEdit(selectedVente);
+                  }}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Modifier la vente
+                  </Button>
+                  
+                  {selectedVente.statut === 'Payé' ? (
+                    <Button variant="outline" className="justify-start" onClick={() => handleDownloadFacture(selectedVente.id)}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Télécharger facture
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" className="justify-start" onClick={() => setRecuPreviewOpen(true)}>
+                        <Receipt className="h-4 w-4 mr-2" />
+                        Aperçu du reçu
+                      </Button>
+                      <Button variant="outline" className="justify-start col-span-2" onClick={() => {
+                        setDetailDialogOpen(false);
+                        setReglementDialogOpen(true);
+                      }}>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Ajouter un règlement
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="ghost" onClick={() => setDetailDialogOpen(false)}>Fermer</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Règlement */}
+      <ReglementDialog 
+        open={reglementDialogOpen} 
+        onOpenChange={setReglementDialogOpen} 
+        vente={selectedVente} 
+        onSuccess={async () => {
+          await fetchVentesStats();
+          await selectVente();
+        }} 
+      />
+
+      {/* Dialog Aperçu Reçu */}
+      <Dialog open={recuPreviewOpen} onOpenChange={setRecuPreviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Aperçu du reçu de paiement</DialogTitle>
+          </DialogHeader>
+          {selectedVente && <RecuPreview vente={selectedVente} />}
+          <div className="flex gap-2 justify-end pt-4">
+            <Button variant="outline" onClick={() => setRecuPreviewOpen(false)}>
+              Fermer
+            </Button>
+            <Button onClick={() => {
+              handleDownloadFacture(selectedVente.id, true);
+              setRecuPreviewOpen(false);
+            }}>
+              Télécharger le reçu (PDF)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
