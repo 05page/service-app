@@ -30,6 +30,8 @@ import {
   Image as ImageIcon
 } from "lucide-react";
 import { toast } from 'sonner';
+import { RecuPreview } from "./Form/RecuPreview";
+import { ReglementDialog } from "./Form/ReglementDialog";
 
 type Ventes = {
   ventes_en_attente: number;
@@ -53,6 +55,7 @@ export function VentesSection() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [reglementDialogOpen, setReglementDialogOpen] = useState(false);
+  const [recuPreviewOpen, setRecuPreviewOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [venteDelete, setVendelete] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,11 +67,9 @@ export function VentesSection() {
   const [quantite, setQuantite] = useState("");
   const [prixUnitaire, setPrixUnitaire] = useState("");
   const [prixTotal, setPrixTotal] = useState("");
+  const [intermediaire, setIntermediaire] = useState("");
+  const [montant, setMontant] = useState("");
   const [filterTab, setFilterTab] = useState("all");
-  
-  // États pour règlements
-  const [montantPaye, setMontantPaye] = useState("");
-  const [dateReglement, setDateReglement] = useState(new Date().toISOString().split('T')[0]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
@@ -192,25 +193,6 @@ export function VentesSection() {
       toast.error(message);
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const handleAddReglement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedVente || !montantPaye) {
-      toast.error('Veuillez entrer un montant');
-      return;
-    }
-    
-    try {
-      // Appel API pour ajouter un règlement
-      toast.success('Règlement ajouté avec succès');
-      setReglementDialogOpen(false);
-      setMontantPaye("");
-      await fetchVentesStats();
-      await selectVente();
-    } catch (error: any) {
-      toast.error('Erreur lors de l\'ajout du règlement');
     }
   }
 
@@ -409,12 +391,16 @@ export function VentesSection() {
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
+                intermediaire={intermediaire}
+                setIntermediaire={setIntermediaire}
                 quantite={quantite}
                 setQuantite={setQuantite}
                 prixUnitaire={prixUnitaire}
                 setPrixUnitaire={setPrixUnitaire}
                 prixTotal={prixTotal}
                 setPrixTotal={setPrixTotal}
+                montant={montant}
+                setMontant={setMontant}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -442,12 +428,16 @@ export function VentesSection() {
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
+                intermediaire={intermediaire}
+                setIntermediaire={setIntermediaire}
                 quantite={quantite}
                 setQuantite={setQuantite}
                 prixUnitaire={prixUnitaire}
                 setPrixUnitaire={setPrixUnitaire}
                 prixTotal={prixTotal}
                 setPrixTotal={setPrixTotal}
+                montant={montant}
+                setMontant={setMontant}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -572,17 +562,8 @@ export function VentesSection() {
 
                         <div className="flex gap-2 justify-end">
                           <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleOpenReglement(v)}>
-                            <CreditCard className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleDownloadFacture(v.id, v.statut_paiement !== 'réglé')}
-                          >
-                            {v.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+                            <Eye className="h-4 w-4 mr-1" />
+                            Détails
                           </Button>
                         </div>
                       </div>
@@ -630,18 +611,21 @@ export function VentesSection() {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog Détails */}
+      {/* Dialog Détails avec actions */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Détails de la vente</DialogTitle>
           </DialogHeader>
           {selectedVente && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {selectedVente.photo_url && (
-                <img src={selectedVente.photo_url} alt="Produit" className="w-full h-48 object-cover rounded" />
+                <div className="relative w-full h-48 rounded-lg overflow-hidden bg-muted">
+                  <img src={selectedVente.photo_url} alt="Produit" className="w-full h-full object-cover" />
+                </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
                 <div>
                   <p className="text-sm text-muted-foreground">Référence</p>
                   <p className="font-semibold">{selectedVente.reference}</p>
@@ -668,14 +652,75 @@ export function VentesSection() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Prix total</p>
-                  <p className="font-semibold text-success">{selectedVente.prix_total} Fcfa</p>
+                  <p className="font-semibold text-success text-lg">{selectedVente.prix_total} Fcfa</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Statut paiement</p>
-                  <Badge variant={selectedVente.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
+                  <Badge variant={selectedVente.statut_paiement === 'réglé' ? 'default' : 'destructive'} className="mt-1">
                     {selectedVente.statut_paiement || 'non réglé'}
                   </Badge>
                 </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date de vente</p>
+                  <p className="font-semibold">{new Date(selectedVente.created_at).toLocaleDateString('fr-FR')}</p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Actions disponibles</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start"
+                    onClick={() => {
+                      setDetailDialogOpen(false);
+                      handleEdit(selectedVente);
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Modifier la vente
+                  </Button>
+                  
+                  {selectedVente.statut_paiement === 'réglé' ? (
+                    <Button 
+                      variant="outline" 
+                      className="justify-start"
+                      onClick={() => handleDownloadFacture(selectedVente.id, false)}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Télécharger facture
+                    </Button>
+                  ) : (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        className="justify-start"
+                        onClick={() => setRecuPreviewOpen(true)}
+                      >
+                        <Receipt className="h-4 w-4 mr-2" />
+                        Aperçu du reçu
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="justify-start col-span-2"
+                        onClick={() => {
+                          setDetailDialogOpen(false);
+                          handleOpenReglement(selectedVente);
+                        }}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Ajouter un règlement
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="ghost" onClick={() => setDetailDialogOpen(false)}>
+                  Fermer
+                </Button>
               </div>
             </div>
           )}
@@ -683,46 +728,34 @@ export function VentesSection() {
       </Dialog>
 
       {/* Dialog Règlement */}
-      <Dialog open={reglementDialogOpen} onOpenChange={setReglementDialogOpen}>
-        <DialogContent>
+      <ReglementDialog 
+        open={reglementDialogOpen}
+        onOpenChange={setReglementDialogOpen}
+        vente={selectedVente}
+        onSuccess={async () => {
+          await fetchVentesStats();
+          await selectVente();
+        }}
+      />
+
+      {/* Dialog Aperçu Reçu */}
+      <Dialog open={recuPreviewOpen} onOpenChange={setRecuPreviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Ajouter un règlement</DialogTitle>
+            <DialogTitle>Aperçu du reçu de paiement</DialogTitle>
           </DialogHeader>
-          {selectedVente && (
-            <form onSubmit={handleAddReglement} className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Vente: {selectedVente.reference}</p>
-                <p className="font-semibold mb-4">Montant total: {selectedVente.prix_total} Fcfa</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Montant payé</label>
-                <Input
-                  type="number"
-                  value={montantPaye}
-                  onChange={(e) => setMontantPaye(e.target.value)}
-                  placeholder="Entrez le montant"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Date de règlement</label>
-                <Input
-                  type="date"
-                  value={dateReglement}
-                  onChange={(e) => setDateReglement(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setReglementDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit">
-                  Enregistrer le règlement
-                </Button>
-              </div>
-            </form>
-          )}
+          {selectedVente && <RecuPreview vente={selectedVente} />}
+          <div className="flex gap-2 justify-end pt-4">
+            <Button variant="outline" onClick={() => setRecuPreviewOpen(false)}>
+              Fermer
+            </Button>
+            <Button onClick={() => {
+              handleDownloadFacture(selectedVente.id, true);
+              setRecuPreviewOpen(false);
+            }}>
+              Télécharger le reçu (PDF)
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -20,9 +20,14 @@ import {
   RefreshCw,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  FileText,
+  Receipt,
+  CreditCard
 } from "lucide-react";
 import { toast } from 'sonner';
+import { RecuPreview } from "./Form/RecuPreview";
+import { ReglementDialog } from "./Form/ReglementDialog";
 // Définition d'un type pour les statistiques des ventes
 type Ventes = {
   ventes_en_attente: number;
@@ -46,6 +51,9 @@ export function VentesSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [reglementDialogOpen, setReglementDialogOpen] = useState(false);
+  const [recuPreviewOpen, setRecuPreviewOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false)
   const [venteDelete, setVendelete] = useState<any | null>(null)
   // États du formulaire de création de vente
@@ -58,6 +66,8 @@ export function VentesSection() {
   const [quantite, setQuantite] = useState(""); // Quantité vendue
   const [prixUnitaire, setPrixUnitaire] = useState(""); // Prix unitaire
   const [prixTotal, setPrixTotal] = useState(""); // Prix total calculé automatiquement
+  const [intermediaire, setIntermediaire] = useState(""); // Intermédiaire
+  const [montant, setMontant] = useState(""); // Montant payé
 
   // États pour la pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -404,12 +414,16 @@ export function VentesSection() {
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
+                intermediaire={intermediaire}
+                setIntermediaire={setIntermediaire}
                 quantite={quantite}
                 setQuantite={setQuantite}
                 prixUnitaire={prixUnitaire}
                 setPrixUnitaire={setPrixUnitaire}
                 prixTotal={prixTotal}
                 setPrixTotal={setPrixTotal}
+                montant={montant}
+                setMontant={setMontant}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -438,12 +452,16 @@ export function VentesSection() {
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
+                intermediaire={intermediaire}
+                setIntermediaire={setIntermediaire}
                 quantite={quantite}
                 setQuantite={setQuantite}
                 prixUnitaire={prixUnitaire}
                 setPrixUnitaire={setPrixUnitaire}
                 prixTotal={prixTotal}
                 setPrixTotal={setPrixTotal}
+                montant={montant}
+                setMontant={setMontant}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -600,22 +618,11 @@ export function VentesSection() {
                     {/* Boutons modifier et télécharger */}
                     <div className="flex gap-2 pt-2">
                       <Button size="sm" variant="outline" onClick={() => handleEdit(vente)}>Modifier</Button>
-                      <Button
-                        onClick={() => handleDownloadFacture(vente.id)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Facture PDF
-                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => {
+                        setSelectedVente(vente);
+                        setDetailDialogOpen(true);
+                      }}>Voir détails</Button>
                       <Button size="sm" variant="outline" onClick={() => handleClick(vente)}>Supprimer</Button>
-                      <DeleteDialog
-                        open={deleteDialogOpen}
-                        openChange={setDeleteDialogOpen}
-                        onConfirm={handleDelete}
-                        itemName={`la commande ${venteDelete?.reference}`}
-                        description= "Cela suprrimera toutes les actions liées à cette vente. Cette action est irréversible."
-                        isDeleting={isDeleting}
-                      />
                     </div>
                   </div>
                 </CardContent>
