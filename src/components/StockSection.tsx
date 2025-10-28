@@ -92,9 +92,6 @@ export function StockSection() {
       const response = await api.get('/stock/');
       setSelectStock(response.data.data);
 
-      // Récupérer aussi les mouvements de stock
-      const mouvementsRes = await api.get('/stock/mouvements');
-      setMouvements(mouvementsRes.data.data || []);
     } catch (error) {
       console.error('Erreur survenue lors de la récupération', error);
     } finally {
@@ -546,13 +543,13 @@ export function StockSection() {
                       <TableCell>
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                           <PackagePlus className="h-3 w-3 mr-1" />
-                          {entrees}
+                          {s?.entre_stock}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                           <PackageMinus className="h-3 w-3 mr-1" />
-                          {sorties}
+                          {s?.sortie_stock}
                         </Badge>
                       </TableCell>
                       <TableCell>{s.achat?.prix_unitaire || 0} Fcfa</TableCell>

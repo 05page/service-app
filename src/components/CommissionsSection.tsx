@@ -1,88 +1,156 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from "../api/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Search, 
-  DollarSign, 
-  TrendingUp, 
-  Users, 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Search,
+  DollarSign,
+  TrendingUp,
+  Users,
   Calendar,
-  Download,
-  Plus,
+  RefreshCw,
   Eye,
-  CreditCard
+  CreditCard,
+  AlertCircle,
+  CheckCircle
 } from "lucide-react";
+import { toast } from 'sonner';
 
-const commissionsData = [
-  {
-    id: 1,
-    nom: "Marie Dubois",
-    type: "Intermédiaire",
-    ventesTotales: 45000,
-    tauxCommission: 8,
-    commissionDue: 3600,
-    commissionPayee: 2800,
-    statut: "En attente",
-    dernierPaiement: "2024-01-15"
-  },
-  {
-    id: 2,
-    nom: "Pierre Martin",
-    type: "Employé",
-    ventesTotales: 32000,
-    tauxCommission: 5,
-    commissionDue: 1600,
-    commissionPayee: 1600,
-    statut: "Payé",
-    dernierPaiement: "2024-01-20"
-  },
-  {
-    id: 3,
-    nom: "Sophie Bernard",
-    type: "Intermédiaire",
-    ventesTotales: 28000,
-    tauxCommission: 7,
-    commissionDue: 1960,
-    commissionPayee: 980,
-    statut: "Partiel",
-    dernierPaiement: "2024-01-10"
-  },
-  {
-    id: 4,
-    nom: "Lucas Petit",
-    type: "Employé",
-    ventesTotales: 38000,
-    tauxCommission: 6,
-    commissionDue: 2280,
-    commissionPayee: 0,
-    statut: "En attente",
-    dernierPaiement: "-"
-  }
-];
-
-export function CommissionsSection() {
+export function CommissionSection() {
+  const [commissions, setCommissions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [selectedCommission, setSelectedCommission] = useState<any>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [montantVerse, setMontantVerse] = useState("");
 
-  const filteredCommissions = commissionsData.filter(commission =>
-    commission.nom.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalCommissionsDues = commissionsData.reduce((sum, c) => sum + c.commissionDue, 0);
-  const totalCommissionsPayees = commissionsData.reduce((sum, c) => sum + c.commissionPayee, 0);
-  const commissionsEnAttente = commissionsData.filter(c => c.statut === "En attente").length;
-
-  const getStatutColor = (statut: string) => {
-    switch (statut) {
-      case "Payé": return "bg-green-100 text-green-800";
-      case "En attente": return "bg-yellow-100 text-yellow-800";
-      case "Partiel": return "bg-orange-100 text-orange-800";
-      default: return "bg-gray-100 text-gray-800";
+  // Récupérer les commissions
+  const fetchCommissions = async () => {
+    try {
+      const response = await api.get('commissions/');
+      setCommissions(response.data.data || []);
+      console.log("Commissions:", response.data.data);
+    } catch (error: any) {
+      console.error('Erreur récupération commissions:', error);
+      if (error.response?.status === 403) {
+        toast.error('Accès refusé. Vous n\'avez pas les permissions nécessaires');
+      } else {
+        toast.error('Erreur lors du chargement des commissions');
+      }
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Actualiser les données
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchCommissions();
+      toast.success('Données actualisées');
+    } catch (error) {
+      toast.error('Erreur lors de l\'actualisation');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Ouvrir le dialog de paiement
+  const handleOpenPayDialog = (commission: any) => {
+    setSelectedCommission(commission);
+    setMontantVerse(commission.commission_due?.toString() || "");
+    setPayDialogOpen(true);
+  };
+
+  // Payer une commission
+  const handlePayCommission = async () => {
+    if (!selectedCommission || !montantVerse) {
+      toast.error('Veuillez renseigner le montant');
+      return;
+    }
+
+    setIsPaying(true);
+    try {
+      const response = await api.post(`commissions/${selectedCommission.id}`, {
+        montant_verse: parseFloat(montantVerse)
+      });
+
+      toast.success(response.data.message || 'Commission payée avec succès');
+      setPayDialogOpen(false);
+      setSelectedCommission(null);
+      setMontantVerse("");
+      await fetchCommissions();
+    } catch (error: any) {
+      console.error('Erreur paiement commission:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors du paiement";
+      toast.error(message);
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  // Voir les détails
+  const handleViewDetails = (commission: any) => {
+    setSelectedCommission(commission);
+    setDetailDialogOpen(true);
+  };
+
+  useEffect(() => {
+    fetchCommissions();
+  }, []);
+
+  // Filtrer les commissions
+  const filteredCommissions = commissions.filter(c =>
+    c.user?.fullname?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Filtrer par statut selon l'onglet
+  const getFilteredByTab = () => {
+    if (activeTab === "paye") {
+      return filteredCommissions.filter(c => c.etat_commission === true);
+    }
+    if (activeTab === "non_paye") {
+      return filteredCommissions.filter(c => c.etat_commission === false);
+    }
+    return filteredCommissions;
+  };
+
+  const displayedCommissions = getFilteredByTab();
+
+  // Calculs statistiques
+  const totalCommissionDues = commissions.reduce((acc, c) => acc + (parseFloat(c.commission_due) || 0), 0);
+  const totalCommissionPayees = commissions.filter(c => c.etat_commission === true)
+    .reduce((acc, c) => acc + (parseFloat(c.commission_due) || 0), 0);
+  const totalCommissionEnAttente = commissions.filter(c => c.etat_commission === false).length;
+  const tauxMoyen = commissions.length > 0
+    ? commissions.reduce((sum, c) => sum + (parseFloat(c.user?.taux_commission) || 0), 0) / commissions.length
+    : 0;
+
+  const getStatutColor = (etat: boolean) => {
+    return etat ? "default" : "destructive";
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Chargement des commissions...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -93,16 +161,14 @@ export function CommissionsSection() {
             Suivez et gérez les commissions de vos intermédiaires et employés
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Exporter
-          </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvelle commission
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Actualiser
+        </Button>
       </div>
 
       {/* Statistiques globales */}
@@ -113,9 +179,11 @@ export function CommissionsSection() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(totalCommissionsDues - totalCommissionsPayees).toLocaleString()} €</div>
+            <div className="text-2xl font-bold">
+              {(totalCommissionDues - totalCommissionPayees).toLocaleString('fr-FR')} Fcfa
+            </div>
             <p className="text-xs text-muted-foreground">
-              Sur {totalCommissionsDues.toLocaleString()} € dus
+              Sur {totalCommissionDues.toLocaleString('fr-FR')} Fcfa dus
             </p>
           </CardContent>
         </Card>
@@ -126,9 +194,11 @@ export function CommissionsSection() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCommissionsPayees.toLocaleString()} €</div>
+            <div className="text-2xl font-bold">
+              {totalCommissionPayees.toLocaleString('fr-FR')} Fcfa
+            </div>
             <p className="text-xs text-muted-foreground">
-              {((totalCommissionsPayees / totalCommissionsDues) * 100).toFixed(1)}% du total
+              {totalCommissionDues > 0 ? ((totalCommissionPayees / totalCommissionDues) * 100).toFixed(1) : 0}% du total
             </p>
           </CardContent>
         </Card>
@@ -139,7 +209,7 @@ export function CommissionsSection() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{commissionsEnAttente}</div>
+            <div className="text-2xl font-bold">{totalCommissionEnAttente}</div>
             <p className="text-xs text-muted-foreground">
               Paiements en attente
             </p>
@@ -153,7 +223,7 @@ export function CommissionsSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(commissionsData.reduce((sum, c) => sum + c.tauxCommission, 0) / commissionsData.length).toFixed(1)}%
+              {tauxMoyen.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">
               Commission moyenne
@@ -164,13 +234,19 @@ export function CommissionsSection() {
 
       {/* Onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
-          <TabsTrigger value="payments">Paiements</TabsTrigger>
-          <TabsTrigger value="history">Historique</TabsTrigger>
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Toutes ({commissions.length})
+          </TabsTrigger>
+          <TabsTrigger value="paye" className="data-[state=active]:bg-success data-[state=active]:text-white">
+            Payées ({commissions.filter(c => c.etat_commission === true).length})
+          </TabsTrigger>
+          <TabsTrigger value="non_paye" className="data-[state=active]:bg-warning data-[state=active]:text-white">
+            Non payées ({commissions.filter(c => c.etat_commission === false).length})
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
+        <TabsContent value={activeTab} className="space-y-4 mt-4">
           {/* Barre de recherche */}
           <div className="flex items-center space-x-2">
             <div className="relative flex-1">
@@ -182,89 +258,226 @@ export function CommissionsSection() {
                 className="pl-8"
               />
             </div>
-            <Button>
-              <CreditCard className="mr-2 h-4 w-4" />
-              Payer sélectionnées
-            </Button>
           </div>
 
           {/* Liste des commissions */}
           <div className="space-y-4">
-            {filteredCommissions.map((commission) => (
-              <Card key={commission.id}>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
-                    <div className="md:col-span-2">
-                      <h3 className="font-semibold">{commission.nom}</h3>
-                      <p className="text-sm text-muted-foreground">{commission.type}</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Ventes</p>
-                      <p className="font-semibold">{commission.ventesTotales.toLocaleString()} €</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Taux</p>
-                      <p className="font-semibold">{commission.tauxCommission}%</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Commission</p>
-                      <p className="font-semibold">{commission.commissionDue.toLocaleString()} €</p>
-                      <p className="text-xs text-muted-foreground">
-                        Payé: {commission.commissionPayee.toLocaleString()} €
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <Badge className={getStatutColor(commission.statut)}>
-                        {commission.statut}
-                      </Badge>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm">
-                          Payer
-                        </Button>
+            {displayedCommissions.length > 0 ? (
+              displayedCommissions.map((commission) => (
+                <Card key={commission.id}>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                      <div className="md:col-span-2">
+                        <h3 className="font-semibold">{commission.user?.fullname || 'N/A'}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Vente: {commission.vente?.id || 'N/A'}
+                        </p>
+                      </div>
+
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Prix vente</p>
+                        <p className="font-semibold">
+                          {parseFloat(commission.vente?.prix_total || 0).toLocaleString('fr-FR')} Fcfa
+                        </p>
+                      </div>
+
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Taux</p>
+                        <p className="font-semibold">{commission.user?.taux_commission || 0}%</p>
+                      </div>
+
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Commission</p>
+                        <p className="font-semibold text-success">
+                          {parseFloat(commission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant={getStatutColor(commission.etat_commission)}>
+                          {commission.etat_commission ? 'Payée' : 'Non payée'}
+                        </Badge>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(commission)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {!commission.etat_commission && (
+                            <Button size="sm" onClick={() => handleOpenPayDialog(commission)}>
+                              <CreditCard className="h-4 w-4 mr-1" />
+                              Payer
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Users className="h-16 w-16 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                    Aucune commission disponible
+                  </h3>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialog de paiement */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Payer une commission</DialogTitle>
+          </DialogHeader>
+
+          {selectedCommission && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Bénéficiaire</span>
+                  <span className="font-semibold">{selectedCommission.user?.fullname}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Taux de commission</span>
+                  <span className="font-semibold">{selectedCommission.user?.taux_commission}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Vente associée</span>
+                  <span className="font-semibold">
+                    {parseFloat(selectedCommission.vente?.prix_total || 0).toLocaleString('fr-FR')} Fcfa
+                  </span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-sm font-medium">Commission due</span>
+                  <span className="font-bold text-success">
+                    {parseFloat(selectedCommission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="montant">Montant à verser (Fcfa) *</Label>
+                <Input
+                  id="montant"
+                  type="number"
+                  placeholder="Entrez le montant"
+                  value={montantVerse}
+                  onChange={(e) => setMontantVerse(e.target.value)}
+                  min="1"
+                  required
+                />
+              </div>
+
+              <div className="flex items-start gap-2 text-sm text-muted-foreground bg-blue-50 p-3 rounded">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <p>
+                  Cette action enregistrera le paiement et marquera la commission comme payée.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPayDialogOpen(false)}
+              disabled={isPaying}
+            >
+              Annuler
+            </Button>
+            <Button onClick={handlePayCommission} disabled={isPaying}>
+              {isPaying ? (
+                <span className="flex items-center">
+                  <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                  Paiement...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Confirmer le paiement
+                </span>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de détails */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Détails de la commission</DialogTitle>
+          </DialogHeader>
+
+          {selectedCommission && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informations bénéficiaire</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Nom complet</span>
+                    <span className="font-medium">{selectedCommission.user?.fullname}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Taux de commission</span>
+                    <span className="font-medium">{selectedCommission.user?.taux_commission}%</span>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="payments" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Paiements en cours</CardTitle>
-              <CardDescription>
-                Gérez les paiements de commissions en attente
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Interface de paiement en cours de développement...</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Détails de la vente</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ID Vente</span>
+                    <span className="font-medium">{selectedCommission.ventes_id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Montant de la vente</span>
+                    <span className="font-medium">
+                      {parseFloat(selectedCommission.vente?.prix_total || 0).toLocaleString('fr-FR')} Fcfa
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Historique des paiements</CardTitle>
-              <CardDescription>
-                Consultez l'historique complet des commissions payées
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Historique en cours de développement...</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informations de commission</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Commission due</span>
+                    <span className="font-bold text-success">
+                      {parseFloat(selectedCommission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Statut</span>
+                    <Badge variant={getStatutColor(selectedCommission.etat_commission)}>
+                      {selectedCommission.etat_commission ? 'Payée' : 'Non payée'}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

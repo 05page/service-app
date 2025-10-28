@@ -9,48 +9,39 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
-  Plus,
-  Search,
-  Calendar,
-  User,
-  Package,
-  Euro,
-  TrendingUp,
-  ShoppingCart,
-  RefreshCw,
-  ShieldAlert,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Image as ImageICon,
-  CreditCard,
-  FileText,
-  Receipt,
-  Edit,
-  Trash2
+  Plus, Search, User, Package, Euro, TrendingUp, ShoppingCart, RefreshCw,
+  ShieldAlert, ChevronLeft, ChevronRight, Eye, Edit, Trash2,
+  CreditCard
 } from "lucide-react";
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-// Définition d'un type pour les statistiques des ventes
+
+type ItemVente = {
+  stock_id: string;
+  quantite: string;
+  prix_unitaire: string;
+  sous_total: string;
+}
+
 type Ventes = {
+  ventes_regles: number;
   ventes_en_attente: number;
   total_ventes: number;
   ventes_paye: number;
   chiffres_affaire_total: string;
-  total_client?: number; // Pour admin
-  mes_clients?: number; // Pour employé
+  total_client?: number;
+  mes_clients?: number;
   chiffres_affaire_mois: string;
   taux_commission?: number;
   commissions_payees?: string;
   commissions_en_attente?: string;
 }
 
-// Composant principal pour la section Ventes
 export function VentesSection() {
-  // États pour les statistiques générales
   const [vente, setVentes] = useState<Ventes | null>(null);
   const [selectedVente, setSelectedVente] = useState<any>(null);
   const [selectVentes, setSelectVentes] = useState([]);
+  const [selectCommissionaire, setSelectCommissionaire] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -59,55 +50,56 @@ export function VentesSection() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false)
   const [venteDelete, setVendelete] = useState<any | null>(null)
-  // États du formulaire de création de vente
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [stock, setStock] = useState([]); // Liste des articles en stock
-  const [stockId, setStockId] = useState(""); // ID de l'article sélectionné
-  const [client, setClient] = useState(""); // Nom du client
-  const [numero, setNumero] = useState(""); // Numéro de téléphone du client
-  const [adresse, setAdresse] = useState(""); // Adresse du client
-  const [quantite, setQuantite] = useState(""); // Quantité vendue
-  const [prixUnitaire, setPrixUnitaire] = useState(""); // Prix unitaire
-  const [prixTotal, setPrixTotal] = useState(""); // Prix total calculé automatiquement
-  const [photo, setPhoto] = useState("");
-  const [intermediaire, setIntemediaire] = useState("");
+
+  const [stock, setStock] = useState([]);
+  const [client, setClient] = useState("");
+  const [numero, setNumero] = useState("");
+  const [adresse, setAdresse] = useState("");
+  const [commissionaire, setCommissionnire] = useState("");
   const [montant, setMontant] = useState("");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  // États pour la pagination
+
+  //Etat pour le paiment
+  const [payementDialog, setPayementDialog] = useState(false);
+  const [selectedVenteForPayment, setSelectedVenteForPayment] = useState<any | null>(null);
+  const [montantVerse, setMontantVerse] = useState("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Nouvel état pour gérer plusieurs articles
+  const [items, setItems] = useState<ItemVente[]>([
+    { stock_id: "", quantite: "", prix_unitaire: "", sous_total: "" }
+  ]);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
   const [filterTab, setFilterTab] = useState("all")
-  // Récupère les statistiques de ventes (admin ou employé)
+
   const fetchVentesStats = async () => {
     try {
-      const token = localStorage.getItem("token"); // Récupère le token dans le localStorage
+      const token = localStorage.getItem("token");
       if (!token) {
         console.error('token non trouvé')
         return
       }
-      console.log(token)
-      // Déterminer l'endpoint selon le rôle
       const role = localStorage.getItem("userRole");
       const endpoint = role === "admin" ? "/allStats" : "/ventes/myStats";
-
-      // Requête pour récupérer les statistiques
       const response = await api.get(endpoint);
-      setVentes(response.data.data) // Stocke les stats dans l'état
+      setVentes(response.data.data)
       console.log(response.data.data)
     } catch (error: any) {
       console.error('Erreur de récupération', error);
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
-        window.location.href = '/auth' // Redirige vers l'authentification si token invalide
+        window.location.href = '/auth'
       } else {
         toast.error('Erreur lors du chargement des données');
       }
     } finally {
-      setLoading(false) // Fin du chargement
+      setLoading(false)
     }
   }
 
-  // Récupère toutes les ventes pour l'affichage
   const selectVente = async () => {
     try {
       const response = await api.get('/ventes/');
@@ -116,7 +108,7 @@ export function VentesSection() {
     } catch (error: any) {
       console.error('Erreur survenue lors de la récupération des ventes', error);
       if (error.response?.status === 403) {
-        setAccessDenied(true); // Active l'affichage d'accès refusé
+        setAccessDenied(true);
         toast.error('Accès refusé. Vous n\'avez pas les permissions nécessaires');
       } else {
         toast.error('Erreur lors du chargement des données');
@@ -127,7 +119,16 @@ export function VentesSection() {
     }
   }
 
-  // Récupère les stocks disponibles pour le formulaire
+  const selectCommissionaires = async () => {
+    try {
+      const response = await api.get('/admin/showEmploye')
+      setSelectCommissionaire(response.data.data || [])
+      console.log(response.data.data)
+    } catch (error: any) {
+      console.log('erreur de récupération', error);
+    }
+  }
+
   const fetchFormData = async () => {
     try {
       const stockResponse = await api.get('/stock/');
@@ -138,33 +139,44 @@ export function VentesSection() {
     }
   }
 
-  // Soumission du formulaire de création de vente
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Vérification des champs obligatoires
-    if (!stockId || !client || !numero || !adresse || !quantite || !prixUnitaire) {
+    if (!client || !numero || !adresse || items.length === 0) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
+
+    // Vérifier que tous les items ont un stock_id et une quantité
+    const itemsValides = items.every(item => item.stock_id && item.quantite);
+    if (!itemsValides) {
+      toast.error('Veuillez remplir tous les articles');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Requête POST pour créer la vente
+      // Formater les items selon le format attendu par l'API
+      const formattedItems = items.map(item => ({
+        stock_id: parseInt(item.stock_id),
+        quantite: parseInt(item.quantite)
+      }));
+
       const response = await api.post('/ventes/', {
-        stock_id: parseInt(stockId),
         nom_client: client,
         numero,
         adresse,
-        quantite: parseInt(quantite),
-        intermediaire,
-        montant
+        commissionaire: commissionaire || null,
+        montant_verse: parseFloat(montant) || 0,
+        items: formattedItems
       });
 
       toast.success(response.data.message || 'Vente créée avec succès');
 
-      // Fermer le dialogue et recharger les données
       setDialogOpen(false);
+      resetForm();
       fetchVentesStats();
       selectVente();
 
@@ -179,29 +191,60 @@ export function VentesSection() {
 
   const handleEdit = (upVente: any) => {
     setSelectedVente(upVente)
-    setStockId(upVente.stock_id?.toString() || "");
+    // Si la vente a des items, les charger
+    if (upVente.items && upVente.items.length > 0) {
+      const formattedItems = upVente.items.map((item: any) => ({
+        stock_id: item.stock_id?.toString() || "",
+        quantite: item.quantite?.toString() || "",
+        prix_unitaire: item.prix_unitaire?.toString() || "",
+        sous_total: item.sous_total?.toString() || ""
+      }));
+      setItems(formattedItems);
+    } else {
+      // Format ancien (une seule ligne)
+      setItems([{
+        stock_id: upVente.stock_id?.toString() || "",
+        quantite: upVente.quantite?.toString() || "",
+        prix_unitaire: "",
+        sous_total: ""
+      }]);
+    }
     setClient(upVente?.nom_client || "");
     setNumero(upVente?.numero || "");
     setAdresse(upVente?.adresse || "");
-    setQuantite(upVente?.quantite || "")
+    setCommissionnire(upVente?.commissionaire?.toString() || "");
+    setMontant(upVente?.montant_verse?.toString() || "");
     setEditDialogOpen(true)
   }
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVente) return
-    if (!stockId || !client || !numero || !adresse || !quantite || !prixUnitaire) {
+    if (!client || !numero || !adresse || items.length === 0) {
       toast.error("Veuillez remplir tous les champs obligatoires")
       return
     }
+
+    const itemsValides = items.every(item => item.stock_id && item.quantite);
+    if (!itemsValides) {
+      toast.error('Veuillez remplir tous les articles');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      const formattedItems = items.map(item => ({
+        stock_id: parseInt(item.stock_id),
+        quantite: parseInt(item.quantite)
+      }));
+
       const response = await api.put(`/ventes/${selectedVente.id}`, {
-        stock_id: parseInt(stockId),
         nom_client: client,
         numero,
         adresse,
-        quantite: parseInt(quantite),
+        commissionaire: commissionaire || null,
+        montant_verse: parseFloat(montant) || 0,
+        items: formattedItems
       })
       toast.success(response.data.message || "Vente mis à jour");
       setVentes(null);
@@ -219,17 +262,14 @@ export function VentesSection() {
   }
 
   const resetForm = () => {
-    // Réinitialisation du formulaire
-    setStockId("");
     setClient("");
     setNumero("");
     setAdresse("");
-    setQuantite("");
-    setPrixUnitaire("");
-    setPrixTotal("");
-    setPhoto("")
+    setCommissionnire("");
+    setMontant("");
+    setItems([{ stock_id: "", quantite: "", prix_unitaire: "", sous_total: "" }]);
   }
-  // Actualisation des données
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -245,7 +285,6 @@ export function VentesSection() {
     }
   }
 
-  // Téléchargement de la facture PDF pour une vente
   const handleDownloadFacture = async (venteId: string) => {
     try {
       toast.info('Génération de facture en cours...');
@@ -263,7 +302,6 @@ export function VentesSection() {
       document.body.appendChild(link);
       link.click();
 
-      // Nettoyage de l'objet URL
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
@@ -289,12 +327,60 @@ export function VentesSection() {
     setDetailDialogOpen(true);
   }
 
+  const closeDetailDialog = () => {
+    setDetailDialogOpen(false);
+    setSelectedVente(null);
+  }
+
+  const handleOpenPaymentDialog = (vente: any) => {
+    setSelectedVenteForPayment(vente);
+    setMontantVerse("");
+    setPayementDialog(true);
+  };
+
   const handleClick = (v: any) => {
     setVendelete(v)
     setDeleteDialogOpen(true)
   }
+
+  //Traiter le paiement
+  const handleProcessPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVenteForPayment || !montantVerse) {
+      toast.error("Veuillez saisir un montant");
+      return;
+    }
+
+    const montant = parseFloat(montantVerse);
+    if (montant <= 0) {
+      toast.error('Le montant doit être supérieur à 0');
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const response = await api.put(`ventes/reglement/${selectedVenteForPayment.id}`, {
+        montant_verse: montant
+      });
+
+      toast.success(response.data.message || 'Paiment enregistré avec succès');
+      setPayementDialog(false);
+      setSelectedVenteForPayment(null);
+      setMontantVerse("");
+
+      await Promise.all([fetchVentesStats(), selectVente()]);
+    } catch (error: any) {
+      console.error('Erreur de paiement:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors de l'enregistrement du paiement";
+      toast.error(message);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }
+
   const handleDelete = async () => {
     if (venteDelete) {
+      setIsDeleting(true);
       try {
         await api.delete(`ventes/${venteDelete.id}`);
         await Promise.all([fetchVentesStats(), selectVente()]);
@@ -309,45 +395,26 @@ export function VentesSection() {
       }
     }
   }
-  // useEffect pour initialiser les données
+
   useEffect(() => {
     fetchVentesStats()
     selectVente()
     fetchFormData()
+    selectCommissionaires()
   }, [])
 
-  // Calcul automatique du prix total en fonction de la quantité et du prix unitaire
-  useEffect(() => {
-    const q = parseInt(quantite) || 0;
-    const pU = parseFloat(prixUnitaire) || 0;
-    setPrixTotal((q * pU).toFixed(2))
-  }, [quantite, prixUnitaire])
-
-  // Met à jour le prix unitaire quand un stock est sélectionné
-  useEffect(() => {
-    if (stockId) {
-      const selectedStock = stock.find((s: any) => s.id === parseInt(stockId));
-      if (selectedStock) {
-        setPrixUnitaire(selectedStock.prix_vente.toString());
-      }
-    }
-  }, [stockId, stock]);
-
-  // Filtrer les ventes selon le statut
   const filteredVentes = selectVentes.filter((v: any) => {
     if (filterTab === "all") return true;
-    if (filterTab === "regle") return v.statut_paiement === "réglé";
-    if (filterTab === "non_regle") return v.statut_paiement === "non réglé" || v.statut_paiement === "partiel";
+    if (filterTab === "regle") return v.est_soldee === true;
+    if (filterTab === "non_regle") return v.est_soldee === false;
     return true;
   });
 
-  // Calculs pour la pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentVentes = filteredVentes.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredVentes.length / itemsPerPage);
 
-  // Fonctions de navigation
   const goToNextPage = () => {
     setCurrentPage(page => Math.min(page + 1, totalPages));
   };
@@ -360,7 +427,6 @@ export function VentesSection() {
     setCurrentPage(pageNumber);
   };
 
-  // Affichage pendant le chargement
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -373,7 +439,7 @@ export function VentesSection() {
       </div>
     );
   }
-  // Affichage en cas d'accès refusé (erreur 403)
+
   if (accessDenied) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -389,9 +455,9 @@ export function VentesSection() {
       </div>
     );
   }
+
   return (
     <div className="space-y-6">
-      {/* Header et boutons d'action */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Ventes</h1>
@@ -400,7 +466,6 @@ export function VentesSection() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* Bouton Actualiser */}
           <Button
             variant="outline"
             onClick={handleRefresh}
@@ -410,7 +475,6 @@ export function VentesSection() {
             Actualiser
           </Button>
 
-          {/* Bouton + dialogue pour créer une nouvelle vente */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md">
@@ -419,32 +483,27 @@ export function VentesSection() {
               </Button>
             </DialogTrigger>
 
-            {/* Contenu du formulaire dans le dialogue */}
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle vente</DialogTitle>
               </DialogHeader>
               <FormVente
                 stock={stock}
                 setStock={setStock}
-                stockId={stockId}
-                setStockId={setStockId}
                 client={client}
                 setClient={setClient}
                 numero={numero}
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
-                intermediaire={intermediaire}
-                setIntermediaire={setIntemediaire}
-                quantite={quantite}
-                setQuantite={setQuantite}
-                prixUnitaire={prixUnitaire}
-                setPrixUnitaire={setPrixUnitaire}
-                prixTotal={prixTotal}
-                setPrixTotal={setPrixTotal}
+                commissionaire={commissionaire}
+                setCommissionnire={setCommissionnire}
+                selectCommissionaire={selectCommissionaire}
+                setSelectCommissionaire={setSelectCommissionaire}
                 montant={montant}
                 setMontant={setMontant}
+                items={items}
+                setItems={setItems}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -456,8 +515,7 @@ export function VentesSection() {
           </Dialog>
 
           <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            {/* Contenu du formulaire dans le dialogue */}
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Modifier la vente</DialogTitle>
               </DialogHeader>
@@ -465,24 +523,20 @@ export function VentesSection() {
                 isEdit
                 stock={stock}
                 setStock={setStock}
-                stockId={stockId}
-                setStockId={setStockId}
                 client={client}
                 setClient={setClient}
                 numero={numero}
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
-                intermediaire={intermediaire}
-                setIntermediaire={setIntemediaire}
-                quantite={quantite}
-                setQuantite={setQuantite}
-                prixUnitaire={prixUnitaire}
-                setPrixUnitaire={setPrixUnitaire}
-                prixTotal={prixTotal}
-                setPrixTotal={setPrixTotal}
+                commissionaire={commissionaire}
+                setCommissionnire={setCommissionnire}
+                selectCommissionaire={selectCommissionaire}
+                setSelectCommissionaire={setSelectCommissionaire}
                 montant={montant}
                 setMontant={setMontant}
+                items={items}
+                setItems={setItems}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -495,9 +549,145 @@ export function VentesSection() {
         </div>
       </div>
 
-      {/* Summary cards (stats) */}
+      {/* Dialog de détails de la vente */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Détails de la vente - {selectedVente?.reference}</DialogTitle>
+          </DialogHeader>
+
+          {selectedVente && (
+            <div className="space-y-6">
+              {/* Informations client */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informations Client</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Nom complet</p>
+                    <p className="font-medium">{selectedVente.nom_client}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Téléphone</p>
+                    <p className="font-medium">{selectedVente.numero}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Adresse</p>
+                    <p className="font-medium">{selectedVente.adresse}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Articles commandés */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Articles commandés</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {selectedVente.items && selectedVente.items.length > 0 ? (
+                      selectedVente.items.map((item: any, index: number) => (
+                        <div key={item.id || index} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                          <div className="flex-1">
+                            <p className="font-semibold">{item.nom_produit}</p>
+                            <p className="text-sm text-muted-foreground">Code: {item.code_produit}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Quantité: {item.quantite}</p>
+                            <p className="text-sm text-muted-foreground">Prix unitaire: {parseFloat(item.prix_unitaire).toLocaleString('fr-FR')} Fcfa</p>
+                            <p className="font-semibold text-success">Sous-total: {parseFloat(item.sous_total).toLocaleString('fr-FR')} Fcfa</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">Aucun article</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Informations financières */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informations Financières</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Prix total</span>
+                    <span className="font-semibold">{parseFloat(selectedVente.prix_total).toLocaleString('fr-FR')} Fcfa</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Montant versé</span>
+                    <span className="font-semibold text-success">{parseFloat(selectedVente.montant_verse).toLocaleString('fr-FR')} Fcfa</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Reste à payer</span>
+                    <span className={`font-semibold ${selectedVente.reste_a_payer > 0 ? 'text-warning' : 'text-success'}`}>
+                      {parseFloat(selectedVente.reste_a_payer).toLocaleString('fr-FR')} Fcfa
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-muted-foreground">Statut</span>
+                    <Badge variant={selectedVente.est_soldee ? 'default' : 'destructive'}>
+                      {selectedVente.est_soldee ? 'Réglé' : selectedVente.reglement_statut === 1 ? 'Partiel' : 'Non réglé'}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Commissionnaire */}
+              {selectedVente.commissionnaire && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Commissionnaire</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nom</p>
+                      <p className="font-medium">{selectedVente.commissionnaire.nom}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Taux de commission</p>
+                      <p className="font-medium">{selectedVente.commissionnaire.taux_commission}%</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Informations système */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informations Système</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Créé par</p>
+                    <p className="font-medium">{selectedVente.cree_par?.nom}</p>
+                    <Badge variant="outline" className="mt-1">{selectedVente.cree_par?.role}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Date de création</p>
+                    <p className="font-medium">{selectedVente.created_at}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={closeDetailDialog}>
+                  Fermer
+                </Button>
+                <Button onClick={() => handleDownloadFacture(selectedVente.id)}>
+                  Télécharger la facture
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total ventes */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total ventes</CardTitle>
@@ -511,19 +701,17 @@ export function VentesSection() {
           </CardContent>
         </Card>
 
-        {/* Ventes réglées */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ventes réglées</CardTitle>
             <ShoppingCart className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{vente?.ventes_paye || 0}</div>
+            <div className="text-2xl font-bold text-primary">{vente?.ventes_regles || 0}</div>
             <p className="text-xs text-muted-foreground">Paiements complétés</p>
           </CardContent>
         </Card>
 
-        {/* Ventes en attente */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Non réglées</CardTitle>
@@ -535,7 +723,6 @@ export function VentesSection() {
           </CardContent>
         </Card>
 
-        {/* Total clients */}
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total clients</CardTitle>
@@ -550,8 +737,6 @@ export function VentesSection() {
         </Card>
       </div>
 
-
-      {/* Section recherche et filtres */}
       <Tabs value={filterTab} onValueChange={setFilterTab} className="w-full">
         <div className="flex items-center justify-between mb-4">
           <TabsList className="grid w-full max-w-md grid-cols-3">
@@ -559,10 +744,10 @@ export function VentesSection() {
               Toutes ({selectVentes.length})
             </TabsTrigger>
             <TabsTrigger value="regle" className="data-[state=active]:bg-success data-[state=active]:text-white">
-              Réglées ({selectVentes.filter((v: any) => v.statut_paiement === "réglé").length})
+              Réglées ({selectVentes.filter((v: any) => v.est_soldee === true).length})
             </TabsTrigger>
             <TabsTrigger value="non_regle" className="data-[state=active]:bg-warning data-[state=active]:text-white">
-              Non réglées ({selectVentes.filter((v: any) => v.statut_paiement === "non réglé" || v.statut_paiement === "partiel").length})
+              Non réglées ({selectVentes.filter((v: any) => v.est_soldee === false).length})
             </TabsTrigger>
           </TabsList>
         </div>
@@ -584,88 +769,96 @@ export function VentesSection() {
                   <>
                     {currentVentes.map((v: any) => (
                       <div key={v.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                        <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
                           <div className="flex items-center gap-3">
-                            {v.photo_url ? (
-                              <img src={v.photo_url} alt={v.nom_produit} className="w-12 h-12 rounded object-cover" />
-                            ) : (
-                              <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                                <Package className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                            )}
                             <div>
                               <p className="font-semibold">{v.reference}</p>
-                              <p className="text-sm text-muted-foreground">{v.nom_produit}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {v.nombre_articles || 0} article(s) - {v.total_quantite || 0} unité(s)
+                              </p>
                             </div>
                           </div>
 
                           <div>
                             <p className="text-sm text-muted-foreground">Client</p>
                             <p className="font-medium">{v.nom_client}</p>
+                            <p className="text-xs text-muted-foreground">{v.numero}</p>
                           </div>
 
                           <div>
                             <p className="text-sm text-muted-foreground">Personnel</p>
-                            <p className="font-medium">{v.employe_nom || 'N/A'}</p>
+                            <p className="font-medium">{v.cree_par?.nom || 'N/A'}</p>
                             <Badge variant="outline" className="text-xs mt-1">
-                              {v.employe_role || 'employé'}
+                              {v.cree_par?.role || 'employé'}
                             </Badge>
-                            {v.commission_touche && (
-                              <p className="text-xs text-success mt-1">✓ Commissionné</p>
-                            )}
                           </div>
 
                           <div>
                             <p className="text-sm text-muted-foreground">Montant</p>
-                            <p className="font-semibold text-success">{v.prix_total} Fcfa</p>
+                            <p className="font-semibold text-success">{parseFloat(v.montant_verse).toLocaleString('fr-FR')} Fcfa</p>
+                            {v.reste_a_payer > 0 && (
+                              <p className="text-xs text-warning">Reste: {parseFloat(v.reste_a_payer).toLocaleString('fr-FR')} Fcfa</p>
+                            )}
                           </div>
 
                           <div>
+                            <p className="text-sm text-muted-foreground">Prix_total</p>
+                            <p className="font-semibold text-success">{parseFloat(v.prix_total).toLocaleString('fr-FR')} Fcfa</p>
+                          </div>
+                          <div>
                             <p className="text-sm text-muted-foreground">Statut</p>
-                            <Badge variant={v.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
-                              {v.statut_paiement || 'non réglé'}
+                            <Badge variant={v.est_soldee ? 'default' : 'destructive'}>
+                              {v.est_soldee ? 'Réglé' : v.reglement_statut === 1 ? 'Partiel' : 'Non réglé'}
                             </Badge>
                           </div>
 
                           <div>
                             <p className="text-sm text-muted-foreground">Date</p>
-                            <p className="text-sm">{new Date(v.created_at).toLocaleDateString('fr-FR')}</p>
+                            <p className="text-sm">{v.created_at}</p>
                           </div>
                         </div>
 
                         <div className="flex gap-2 justify-end border-t pt-3 mt-3">
                           <Button variant="outline" size="sm" onClick={() => handleViewDetails(v)}>
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4 mr-2" />
+                            Détails
                           </Button>
+                          {(v.est_soldee === false || v.reste_a_payer > 0) && (
+                            <Button size="sm" variant="outline"
+                              className="text-green-600 hover:text-green-700 hover:border-green-300"
+                              onClick={() => handleOpenPaymentDialog(v)}>
+                              <CreditCard className="h-4 w-4 mr-2" />
+                              Régler
+                            </Button>
+                          )}
                           <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleClick(v)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                          <DeleteDialog
-                            open={deleteDialogOpen}
-                            openChange={setDeleteDialogOpen}
-                            onConfirm={handleDelete}
-                            itemName={`la commande ${venteDelete?.reference}`}
-                            description="Cela suprrimera toutes les actions liées à cette vente. Cette action est irréversible."
-                            isDeleting={isDeleting}
-                          />
                         </div>
                       </div>
                     ))}
 
-                    {/* Composant de pagination */}
+                    <DeleteDialog
+                      open={deleteDialogOpen}
+                      openChange={setDeleteDialogOpen}
+                      onConfirm={handleDelete}
+                      itemName={`la commande ${venteDelete?.reference}`}
+                      description="Cela suprrimera toutes les actions liées à cette vente. Cette action est irréversible."
+                      isDeleting={isDeleting}
+                    />
+                    {/* Pagination */}
                     {totalPages > 1 && (
                       <Card className="shadow-[var(--shadow-card)]">
                         <CardContent className="py-4">
                           <div className="flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
-                              Affichage de {indexOfFirstItem + 1} à {Math.min(indexOfLastItem, selectVentes.length)} sur {selectVentes.length} ventes
+                              Affichage de {indexOfFirstItem + 1} à {Math.min(indexOfLastItem, filteredVentes.length)} sur {filteredVentes.length} ventes
                             </div>
 
                             <div className="flex items-center gap-2">
-                              {/* Bouton Précédent */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -676,7 +869,6 @@ export function VentesSection() {
                                 Précédent
                               </Button>
 
-                              {/* Numéros de pages */}
                               <div className="flex gap-1">
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
                                   <Button
@@ -691,7 +883,6 @@ export function VentesSection() {
                                 ))}
                               </div>
 
-                              {/* Bouton Suivant */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -708,7 +899,6 @@ export function VentesSection() {
                     )}
                   </>
                 ) : (
-                  // Affichage si aucune vente
                   <Card className="shadow-[var(--shadow-card)]">
                     <CardContent className="flex flex-col items-center justify-center py-12">
                       <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />
@@ -724,88 +914,99 @@ export function VentesSection() {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog Détails */}
-      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      {/* Dialog de paiement/règlement */}
+      <Dialog open={payementDialog} onOpenChange={setPayementDialog}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Détails de la vente</DialogTitle>
+            <DialogTitle>Enregister un paiement</DialogTitle>
           </DialogHeader>
-          {selectedVente && (
-            <div className="space-y-4">
-              {selectedVente.photo_url ? (
-                <img src={selectedVente.photo_url} alt="Produit" className="w-full h-48 object-cover rounded" />
-              ) : (
-                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                  <Package className="h-16 w-16 text-muted-foreground" />
+
+          {selectedVenteForPayment && (
+            <form onSubmit={handleProcessPayment} className="space-y4">
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Client</span>
+                  <span className="font-medium">{selectedVenteForPayment.nom_client}</span>
                 </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Référence</p>
-                  <p className="font-semibold">{selectedVente.reference}</p>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-sm text-muted-foreground">Prix total</span>
+                  <span className="font-semibold">
+                    {parseFloat(selectedVenteForPayment.prix_total).toLocaleString('fr-FR')} Fcfa
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Produit</p>
-                  <p className="font-semibold">{selectedVente.nom_produit}</p>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Déjà versé</span>
+                  <span className="font-medium text-success">
+                    {parseFloat(selectedVenteForPayment.montant_verse).toLocaleString('fr-FR')} Fcfa
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Client</p>
-                  <p className="font-semibold">{selectedVente.nom_client}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Téléphone</p>
-                  <p className="font-semibold">{selectedVente.numero}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Adresse</p>
-                  <p className="font-semibold">{selectedVente.adresse}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Quantité</p>
-                  <p className="font-semibold">{selectedVente.quantite}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Prix total</p>
-                  <p className="font-semibold text-success">{selectedVente.prix_total} Fcfa</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Statut paiement</p>
-                  <Badge variant={selectedVente.statut_paiement === 'réglé' ? 'default' : 'destructive'}>
-                    {selectedVente.statut_paiement || 'non réglé'}
-                  </Badge>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-muted-foreground mb-2">Personnel</p>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold">{selectedVente.employe_nom || 'N/A'}</p>
-                        <Badge variant="outline" className="mt-1">
-                          {selectedVente.employe_role || 'employé'}
-                        </Badge>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Commission</p>
-                        <p className="font-semibold text-primary">
-                          {selectedVente.commission_montant ? `${selectedVente.commission_montant} Fcfa` : 'N/A'}
-                        </p>
-                        {selectedVente.commission_touche && (
-                          <Badge variant="default" className="mt-1">
-                            ✓ Commissionné
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-sm font-medium">Reste à payer</span>
+                  <span className="font-bold text-warning">
+                    {parseFloat(selectedVenteForPayment.reste_a_payer).toLocaleString('fr-FR')} Fcfa
+                  </span>
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm">
-                {selectedVente.statut_paiement === 'réglé' ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
-              </Button>
-            </div>
+              {/* Champ de saisie du montant */}
+              <div className="space-y-2">
+                <label htmlFor="montant_verse" className="text-sm font-medium">
+                  Montant à verser (Fcfa) *
+                </label>
+                <Input
+                  id="montant_verse"
+                  type="number"
+                  placeholder="Entrez le montant"
+                  value={montantVerse}
+                  onChange={(e) => setMontantVerse(e.target.value)}
+                  min="1"
+                  max={selectedVenteForPayment.reste_a_payer}
+                  step="0.01"
+                  required
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">
+                  Montant maximum: {parseFloat(selectedVenteForPayment.reste_a_payer).toLocaleString('fr-FR')} Fcfa
+                </p>
+              </div>
+
+              {/* Message d'information */}
+              <div className="flex items-start gap-2 text-sm text-muted-foreground bg-blue-50 p-3 rounded">
+                <CreditCard className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <p>
+                  Ce paiement sera ajouté au montant déjà versé. Le statut de la vente sera mis à jour automatiquement.
+                </p>
+              </div>
+
+              {/* Boutons */}
+              <div className="flex justify-end space-x-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPayementDialog(false);
+                    setSelectedVenteForPayment(null);
+                    setMontantVerse("");
+                  }}
+                  disabled={isProcessingPayment}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={isProcessingPayment}>
+                  {isProcessingPayment ? (
+                    <span className="flex items-center">
+                      <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                      Traitement...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Enregistrer le paiement
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </form>
           )}
         </DialogContent>
       </Dialog>

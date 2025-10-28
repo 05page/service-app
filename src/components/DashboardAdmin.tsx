@@ -33,8 +33,8 @@ type Stats = {
   total_stock_faible: number;
   total_commissions_dues: number;
   total_commissions_reversees: number;
-  total_entrees_stock: number;
-  total_sorties_stock: number;
+  total_entrees_stock: string;
+  total_sorties_stock: string;
 };
 
 export const DashboardAdmin = () => {
@@ -53,6 +53,7 @@ export const DashboardAdmin = () => {
       console.log(token)
       const response = await api.get('/dashboard');
       setStats(response.data.data);
+      console.log(response.data.data)
     } catch (error) {
       console.error('Erreur de récupération du dashboard', error);
 
@@ -110,11 +111,11 @@ export const DashboardAdmin = () => {
               Vérifiez votre connexion et réessayez.
             </p>
             <Button
-              onClick={fecthDashboard}
+              onClick={handleRefresh}
               className="flex items-center gap-2"
-              disabled={loading}
+              disabled={refreshing}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               Actualiser les données
             </Button>
           </CardContent>
@@ -125,18 +126,18 @@ export const DashboardAdmin = () => {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Tableau de bord Administrateur</h1>
-        <p className="text-muted-foreground">Vue d'ensemble complète de votre activité commerciale</p>
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Tableau de bord Administrateur</h1>
+          <p className="text-muted-foreground">Vue d'ensemble complète de votre activité commerciale</p>
         </div>
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Actualiser
-          </Button>
+        <Button
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Actualiser
+        </Button>
       </div>
 
 
@@ -281,28 +282,6 @@ export const DashboardAdmin = () => {
           </CardContent>
         </Card>
 
-        {/* <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-card-foreground">
-              <UserCheck className="h-5 w-5 text-primary" />
-              Intermédiaires
-            </CardTitle>
-            <CardDescription>
-              Gestion des commissions et performances
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">Intermédiaires actifs</span>
-              <Badge variant="secondary">156</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">Commission moyenne</span>
-              <Badge variant="outline">4.2%</Badge>
-            </div>
-          </CardContent>
-        </Card> */}
-
         <Card className="border-border bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-card-foreground">
@@ -318,10 +297,6 @@ export const DashboardAdmin = () => {
               <span className="text-sm text-card-foreground">Fournisseurs actifs</span>
               <Badge variant="secondary">{stats?.total_fournisseurs}</Badge>
             </div>
-            {/* <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">Commandes en cours</span>
-              <Badge variant="outline">18</Badge>
-            </div> */}
           </CardContent>
         </Card>
 

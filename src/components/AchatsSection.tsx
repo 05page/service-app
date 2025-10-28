@@ -6,11 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign, RefreshCw, FileText, ShieldAlert, Image as ImageIcon, Eye } from "lucide-react";
+import {
+  Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign,
+  RefreshCw, FileText, ShieldAlert, Image as ImageIcon, Eye, X,
+  ChevronLeft, ChevronRight, Upload
+} from "lucide-react";
 import { toast } from 'sonner';
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
@@ -47,12 +51,19 @@ export function AchatsSection() {
   const [dateLivraison, setDateLivraison] = useState("");
   const [statut, setStatut] = useState("");
   const [description, setDescription] = useState("");
-  const [photo, setPhoto] = useState("");
+
+  // Gestion des photos
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [achatDelete, setAchatDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detail, setDetail] = useState<any>(null);
+
+  // Pour la galerie dans les détails
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   const fecthAchats = async () => {
     try {
@@ -60,31 +71,22 @@ export function AchatsSection() {
       if (!token) {
         console.error('token non trouvé');
       }
-      console.log(token);
-      //Réupération des stats
       const role = localStorage.getItem("userRole");
       const endpoint = role === "admin" ? "/allStats" : "/achat/stats";
       const response = await api.get(endpoint);
       setSelectCount(response.data.data);
 
-      //Récupération des fournisseurs 
       const res = await api.get('/fournisseurs')
-      console.log('Réponse API fournisseurs:', res.data.data);
       if (res.data.success && res.data.data) {
-        console.log('Nombre de fournisseurs trouvés:', res.data.data.length);
         setFournisseur(res.data.data);
       } else {
-        console.warn('Aucun fournisseur trouvé');
         setFournisseur([]);
       }
     } catch (error: any) {
       console.error('Erreur de récupération', error);
       if (error.response) {
         if (error.response.status === 401) {
-          console.error('Token invalide ou expiré. Veuillez vous reconnecter');
           window.location.href = '/auth';
-        } else {
-          console.error('Erreur API:', error.response.data.message || 'Erreur inconnue');
         }
       }
       setFournisseur([]);
@@ -100,10 +102,8 @@ export function AchatsSection() {
     } catch (error: any) {
       console.error('Erreur survenue lors de la récupération des achats', error);
       if (error.response?.status === 403) {
-        setAccessDenied(true); // Active l'affichage d'accès refusé
+        setAccessDenied(true);
         toast.error('Accès refusé. Vous n\'avez pas les permissions nécessaires');
-      } else {
-        console.error('Erreur lors du chargement des données');
       }
       setchAchat([]);
     } finally {
@@ -124,6 +124,64 @@ export function AchatsSection() {
     }
   }
 
+  // Gestion des photos
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files);
+    const totalPhotos = photoFiles.length + newFiles.length;
+
+    if (totalPhotos > 4) {
+      toast.error('Vous ne pouvez ajouter que 4 photos maximum');
+      return;
+    }
+
+    // Vérifier la taille et le type de chaque fichier
+    const validFiles = newFiles.filter(file => {
+      if (file.size > 2048 * 1024) {
+        toast.error(`${file.name} est trop volumineux (max 2MB)`);
+        return false;
+      }
+      if (!['image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(file.type)) {
+        toast.error(`${file.name} n'est pas un format valide`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setPhotoFiles(prev => [...prev, ...validFiles]);
+
+    // Créer les previews
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const resetForm = () => {
+    setFournisseurId("");
+    setTypeService("");
+    setQuantite("");
+    setPrixUnitaire("");
+    setDateCommande("");
+    setDateLivraison("");
+    setStatut("");
+    setDescription("");
+    setPhotoFiles([]);
+    setPhotoPreviews([]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fournisseurId || !typeService || !quantite || !prixUnitaire || !dateCommande || !statut) {
@@ -132,26 +190,29 @@ export function AchatsSection() {
     }
     setIsSubmitting(true)
     try {
-      const response = await api.post('/achat/', {
-        fournisseur_id: fournisseurId,
-        nom_service: typeService,
-        quantite: parseInt(quantite),
-        prix_unitaire: parseFloat(prixUnitaire),
-        date_commande: dateCommande,
-        date_livraison: dateLivraison || null,
-        statut,
-        description
+      const formData = new FormData();
+      formData.append('fournisseur_id', fournisseurId);
+      formData.append('nom_service', typeService);
+      formData.append('quantite', quantite);
+      formData.append('prix_unitaire', prixUnitaire);
+      formData.append('date_commande', dateCommande);
+      if (dateLivraison) formData.append('date_livraison', dateLivraison);
+      formData.append('statut', statut);
+      if (description) formData.append('description', description);
+
+      // Ajouter les photos
+      photoFiles.forEach((file) => {
+        formData.append('photos[]', file);
       });
-      toast(response.data.message || 'Achat créé avec succès');
-      setFournisseurId("");
-      setTypeService("");
-      setQuantite("");
-      setPrixUnitaire("")
-      setDateCommande("");
-      setDateLivraison("");
-      setStatut("");
-      setDescription("");
-      setPhoto("");
+
+      const response = await api.post('/achat/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      toast.success(response.data.message || 'Achat créé avec succès');
+      resetForm();
       setDialogOpen(false);
       getAchats();
       fecthAchats();
@@ -174,7 +235,6 @@ export function AchatsSection() {
     setDateLivraison(upAchat.date_livraison || "");
     setStatut(upAchat.statut || "");
     setDescription(upAchat.description || "");
-    setPhoto(upAchat.photo || "");
     setEditDialogOpen(true);
   };
 
@@ -185,28 +245,28 @@ export function AchatsSection() {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
-    setIsSubmitting(true)
+
+    setIsSubmitting(true);
     try {
       const response = await api.put(`/achat/${selectAchat.id}`, {
         fournisseur_id: fournisseurId,
         nom_service: typeService,
-        quantite: parseInt(quantite),
-        prix_unitaire: parseFloat(prixUnitaire),
+        quantite,
+        prix_unitaire: prixUnitaire,
         date_commande: dateCommande,
-        date_livraison: dateLivraison || null,
-        statut,
-        description
-      });
-      toast.success(response.data.message || 'Achat mis à jour');
-      setSelectAchat(null)
-      setEditDialogOpen(false);
-      getAchats();
-      fecthAchats();
+        date_livraison: dateLivraison,
+        statut
+      })
+      toast.success(response.data.message || "Achat mis à jour");
+      setEditDialogOpen(false)
+      resetForm();
+      await fecthAchats();
+      await getAchats();
     } catch (error: any) {
-      console.error(error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de mise à jour de l'achat";
-      toast.error(message);
-    } finally {
+      console.error(error.response.data);
+      const message = error?.response?.data?.message || "Erreur survenu lors de mise à jour de l'achat"
+      toast.error(message)
+    }finally{
       setIsSubmitting(false)
     }
   }
@@ -218,6 +278,7 @@ export function AchatsSection() {
 
   const handleDelete = async () => {
     if (achatDelete) {
+      setIsDeleting(true);
       try {
         await api.delete(`/achat/${achatDelete.id}`);
         await Promise.all([fecthAchats(), getAchats()]);
@@ -243,7 +304,6 @@ export function AchatsSection() {
       const blob = new Blob([response.data], { type: 'application/pdf' })
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      document.body.appendChild(link);
       link.href = url;
       link.download = `facture-${achatId}.pdf`;
       document.body.appendChild(link);
@@ -254,7 +314,6 @@ export function AchatsSection() {
     } catch (error: any) {
       if (error.response?.data instanceof Blob) {
         const text = await error.response.data.text();
-        console.error("Réponse brute:", text);
         try {
           const errorData = JSON.parse(text);
           toast.error(errorData.message || 'Erreur lors de la génération de la facture');
@@ -266,7 +325,26 @@ export function AchatsSection() {
       }
     }
   }
-  // Ajoutez ce useEffect après les autres useEffect
+
+  // Navigation dans la galerie
+  const nextPhoto = () => {
+    if (detail?.photos && currentPhotoIndex < detail.photos.length - 1) {
+      setCurrentPhotoIndex(prev => prev + 1);
+    }
+  };
+
+  const prevPhoto = () => {
+    if (currentPhotoIndex > 0) {
+      setCurrentPhotoIndex(prev => prev - 1);
+    }
+  };
+
+  const openDetailDialog = (achat: any) => {
+    setDetail(achat);
+    setCurrentPhotoIndex(0);
+    setDetailDialogOpen(true);
+  };
+
   useEffect(() => {
     if (fournisseurId) {
       const fournisseurSelectionne = fournisseur.find(f => f.id === parseInt(fournisseurId));
@@ -339,7 +417,6 @@ export function AchatsSection() {
     return matchSearch && matchStatut && matchPeriode;
   });
 
-  // Utilisation du hook de pagination sur les clients filtrés
   const { currentPage, totalPages, currentData: currentAchats, setCurrentPage } =
     usePagination({ data: filteredAchats, itemsPerPage: 6 });
 
@@ -355,7 +432,7 @@ export function AchatsSection() {
       </div>
     );
   }
-  // Affichage en cas d'accès refusé (erreur 403)
+
   if (accessDenied) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -384,14 +461,17 @@ export function AchatsSection() {
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 Nouvelle Commande
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle commande</DialogTitle>
               </DialogHeader>
@@ -415,7 +495,7 @@ export function AchatsSection() {
                   <div className="space-y-2">
                     <Label>Service *</Label>
                     <Input value={typeService} onChange={(e) => setTypeService(e.target.value)}
-                      placeholder="Service" disabled className="bg-muted"/>
+                      placeholder="Service" disabled className="bg-muted" />
                   </div>
                   <div className="space-y-2">
                     <Label>Quantité *</Label>
@@ -454,9 +534,61 @@ export function AchatsSection() {
                     <Label>Description</Label>
                     <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
                   </div>
+
+                  {/* Section Photos */}
+                  <div className="col-span-2 space-y-2">
+                    <Label>Photos (Maximum 4)</Label>
+                    <div className="border-2 border-dashed rounded-lg p-4">
+                      <input
+                        type="file"
+                        id="photos"
+                        accept="image/jpeg,image/png,image/jpg,image/webp"
+                        multiple
+                        onChange={handlePhotoChange}
+                        className="hidden"
+                        disabled={photoFiles.length >= 4}
+                      />
+                      <label
+                        htmlFor="photos"
+                        className={`flex flex-col items-center justify-center cursor-pointer ${photoFiles.length >= 4 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                        <span className="text-sm text-muted-foreground">
+                          Cliquez pour ajouter des photos ({photoFiles.length}/4)
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          JPEG, PNG, JPG, WEBP (max 2MB)
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Preview des photos */}
+                    {photoPreviews.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2 mt-2">
+                        {photoPreviews.map((preview, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={preview}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-24 object-cover rounded"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(index)}
+                              className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button type='button' variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+                  <Button type='button' variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                    Annuler
+                  </Button>
                   <Button type='submit' disabled={isSubmitting}>
                     {isSubmitting ? <><RefreshCw className="animate-spin h-4 w-4 mr-2" />Création...</> : "Créer"}
                   </Button>
@@ -464,10 +596,16 @@ export function AchatsSection() {
               </form>
             </DialogContent>
           </Dialog>
-          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DialogContent className="max-w-2xl">
+
+          {/* Dialog Edit - similaire mais avec gestion des photos existantes */}
+          <Dialog open={editDialogOpen} onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Modifier</DialogTitle></DialogHeader>
               <form onSubmit={handleUpdate}>
+                {/* Même structure que le formulaire de création */}
                 <div className="grid grid-cols-2 gap-4 py-4">
                   <div className="space-y-2">
                     <Label>Fournisseur *</Label>
@@ -517,7 +655,9 @@ export function AchatsSection() {
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button type='button' variant="outline" onClick={() => setEditDialogOpen(false)}>Annuler</Button>
+                  <Button type='button' variant="outline" onClick={() => { setEditDialogOpen(false); resetForm(); }}>
+                    Annuler
+                  </Button>
                   <Button type='submit' disabled={isSubmitting}>
                     {isSubmitting ? <><RefreshCw className="animate-spin h-4 w-4 mr-2" />Mise à jour...</> : "Modifier"}
                   </Button>
@@ -527,6 +667,7 @@ export function AchatsSection() {
           </Dialog>
         </div>
       </div>
+
       {/* Statistiques */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -562,7 +703,7 @@ export function AchatsSection() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(selectCount?.total_prix_achats ?? 0).toLocaleString()} Fcfa</div>
+            <div className="text-2xl font-bold">{(selectCount?.total_prix_achats ?? 0).toLocaleString('fr-FR')} Fcfa</div>
           </CardContent>
         </Card>
       </div>
@@ -607,7 +748,7 @@ export function AchatsSection() {
                 <TableHead>Commande</TableHead>
                 <TableHead>Fournisseur</TableHead>
                 <TableHead>Service</TableHead>
-                <TableHead>Photo</TableHead>
+                <TableHead>Photos</TableHead>
                 <TableHead>Quantité</TableHead>
                 <TableHead>Prix unitaire</TableHead>
                 <TableHead>Total</TableHead>
@@ -633,16 +774,21 @@ export function AchatsSection() {
                         <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
                       </div>
                     </TableCell>
-                    <TableCell>{a.quantite}</TableCell>
                     <TableCell>
-                      {a.photo ? (
-                        <img src={photo} alt='produit' className='h-10 w-10 object-cover rounded'/>
-                      ): (
+                      {a.photos && a.photos.length > 0 ? (
+                        <div className="flex items-center gap-1">
+                          <img src={a.photos[0].path} alt='produit' className='h-10 w-10 object-cover rounded' />
+                          {a.photos.length > 1 && (
+                            <span className="text-xs text-muted-foreground">+{a.photos.length - 1}</span>
+                          )}
+                        </div>
+                      ) : (
                         <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
                           <ImageIcon className="h-5 w-5 text-muted-foreground" />
                         </div>
                       )}
                     </TableCell>
+                    <TableCell>{a.quantite}</TableCell>
                     <TableCell>{a.prix_unitaire} Fcfa</TableCell>
                     <TableCell className="font-medium">{a.prix_total} Fcfa</TableCell>
                     <TableCell>
@@ -654,8 +800,8 @@ export function AchatsSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Button onClick={() => {setDetail(a); setDetailDialogOpen(true)}} variant="outline" size="sm" title='Détails'>
-                          <Eye className='h-4 w-4'/>
+                        <Button onClick={() => openDetailDialog(a)} variant="outline" size="sm" title='Détails'>
+                          <Eye className='h-4 w-4' />
                         </Button>
                         <Button onClick={() => handleDownloadFacture(a.id)} variant="outline" size="sm" title='Facture'>
                           <FileText className="h-4 w-4" />
@@ -664,23 +810,15 @@ export function AchatsSection() {
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button onClick={() => handleClick(a)} variant="outline" size="sm">
-                          <Trash2 className= "h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                        <DeleteDialog
-                          open={deleteDialogOpen}
-                          openChange={setDeleteDialogOpen}
-                          onConfirm={handleDelete}
-                          itemName={`la commande ${achatDelete?.numero_achat}`}
-                          description="Cela supprimera toutes les actions liés à cet achat. Cette action est irréversible."
-                          isDeleting={isDeleting}
-                        />
                       </div>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-[400px]">
+                  <TableCell colSpan={10} className="h-[400px]">
                     <div className="flex flex-col items-center justify-center">
                       <Package className="h-16 w-16 text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold text-muted-foreground mb-2">Aucun achat disponible</h3>
@@ -708,7 +846,17 @@ export function AchatsSection() {
         </CardContent>
       </Card>
 
-      {/* Dialog Détails */}
+      {/* Dialog Delete */}
+      <DeleteDialog
+        open={deleteDialogOpen}
+        openChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        itemName={`la commande ${achatDelete?.numero_achat}`}
+        description="Cela supprimera toutes les actions liés à cet achat. Cette action est irréversible."
+        isDeleting={isDeleting}
+      />
+
+      {/* Dialog Détails avec Galerie */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -716,16 +864,72 @@ export function AchatsSection() {
           </DialogHeader>
           {detail && (
             <div className="grid gap-6">
+              {/* Galerie de photos */}
               <div className="flex gap-6">
                 <div className="flex-shrink-0">
-                  {detail.photo ? (
-                    <img src={detail.photo} alt="Produit" className="h-48 w-48 object-cover rounded-lg" />
+                  {detail.photos && detail.photos.length > 0 ? (
+                    <div className="relative">
+                      <img
+                        src={detail.photos[currentPhotoIndex]?.path}
+                        alt="Produit"
+                        className="h-64 w-64 object-cover rounded-lg"
+                      />
+
+                      {/* Navigation photos */}
+                      {detail.photos.length > 1 && (
+                        <>
+                          <button
+                            onClick={prevPhoto}
+                            disabled={currentPhotoIndex === 0}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/70 transition-all"
+                          >
+                            <ChevronLeft className="h-5 w-5" />
+                          </button>
+
+                          <button
+                            onClick={nextPhoto}
+                            disabled={currentPhotoIndex === detail.photos.length - 1}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/70 transition-all"
+                          >
+                            <ChevronRight className="h-5 w-5" />
+                          </button>
+
+                          {/* Indicateur de photos */}
+                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                            {currentPhotoIndex + 1} / {detail.photos.length}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Miniatures */}
+                      {detail.photos.length > 1 && (
+                        <div className="flex gap-2 mt-2">
+                          {detail.photos.map((photo: any, index: number) => (
+                            <button
+                              key={index}
+                              onClick={() => setCurrentPhotoIndex(index)}
+                              className={`relative h-16 w-16 rounded overflow-hidden border-2 transition-all ${currentPhotoIndex === index
+                                  ? 'border-primary ring-2 ring-primary'
+                                  : 'border-transparent hover:border-muted-foreground'
+                                }`}
+                            >
+                              <img
+                                src={photo.path}
+                                alt={`Miniature ${index + 1}`}
+                                className="h-full w-full object-cover"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <div className="h-48 w-48 bg-muted rounded-lg flex items-center justify-center">
+                    <div className="h-64 w-64 bg-muted rounded-lg flex items-center justify-center">
                       <ImageIcon className="h-16 w-16 text-muted-foreground" />
                     </div>
                   )}
                 </div>
+
                 <div className="flex-1 grid gap-3">
                   <div>
                     <p className="text-sm text-muted-foreground">Fournisseur</p>
@@ -751,6 +955,7 @@ export function AchatsSection() {
                   </div>
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Date de commande</p>
@@ -759,8 +964,8 @@ export function AchatsSection() {
                 <div>
                   <p className="text-sm text-muted-foreground">Date de livraison</p>
                   <p className="font-medium">
-                    {detail.date_livraison 
-                      ? new Date(detail.date_livraison).toLocaleDateString('fr-FR') 
+                    {detail.date_livraison
+                      ? new Date(detail.date_livraison).toLocaleDateString('fr-FR')
                       : "Non définie"}
                   </p>
                 </div>
@@ -771,6 +976,7 @@ export function AchatsSection() {
                   </Badge>
                 </div>
               </div>
+
               {detail.description && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Description</p>
@@ -783,4 +989,4 @@ export function AchatsSection() {
       </Dialog>
     </div>
   );
-} 
+}

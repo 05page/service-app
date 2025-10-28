@@ -250,7 +250,7 @@ export function ClientsSection() {
                       <div className="flex items-center gap-6">
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Chiffre d'affaires</p>
-                          <p className="font-bold text-success text-sm">{c.prix_total || 0} Fcfa</p>
+                          <p className="font-bold text-success text-sm">{c.montant_verse || 0} Fcfa</p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Achats</p>

@@ -15,7 +15,7 @@ import { PersonnelSection } from "@/components/PersonnelSection";
 import { AchatsSection } from "@/components/AchatsSection";
 import { StockSection } from "@/components/StockSection";
 import { ProfileSection } from "@/components/ProfileSection";
-import { CommissionsSection } from "@/components/CommissionsSection";
+import { CommissionSection } from "@/components/CommissionsSection";
 import { CommissionEmployeeSection } from "@/components/CommissionEmployeeSection";
 import { SettingsSection } from "@/components/SettingsSection";
 import { UserRole } from "./Auth";
@@ -77,7 +77,7 @@ const Index = () => {
         return userRole === "admin" || userRole === "employe" ? <StockSection /> : renderDashboard();
       case "commissions":
         if (userRole === "admin") {
-          return <CommissionsSection />;
+          return <CommissionSection />;
         } else if (userRole === "employe") {
           return <CommissionEmployeeSection />;
         }

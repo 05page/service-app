@@ -22,31 +22,37 @@ export function CommissionEmployeeSection() {
       }
 
       // Récupérer les commissions de l'employé
-      const response = await api.get('/commissions/mes-commissions');
-      setCommissions(response.data.data || []);
-
-      // Calculer les stats
-      const totalCommissions = response.data.data?.reduce((acc: number, c: any) => acc + parseFloat(c.montant || 0), 0) || 0;
-      const commissionsReversees = response.data.data?.filter((c: any) => c.reversee).reduce((acc: number, c: any) => acc + parseFloat(c.montant || 0), 0) || 0;
-      const commissionsEnAttente = totalCommissions - commissionsReversees;
-      const nombreCommissions = response.data.data?.length || 0;
-
-      setStats({
-        total: totalCommissions,
-        reversees: commissionsReversees,
-        enAttente: commissionsEnAttente,
-        nombre: nombreCommissions
-      });
+      const response = await api.get('/commissions/mesCommissions');
+      
+      if (response.data.success) {
+        setCommissions(response.data.liste || []);
+        setStats(response.data.resume || {});
+      } else {
+        toast.error(response.data.message || 'Erreur lors du chargement des commissions');
+        setCommissions([]);
+        setStats({
+          total_commission: 0,
+          commission_payee: 0,
+          commission_en_attente: 0
+        });
+      }
 
     } catch (error: any) {
       console.error('Erreur lors de la récupération des commissions', error);
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
         window.location.href = '/auth';
+      } else if (error.response?.status === 403) {
+        toast.error(error.response.data.message || 'Accès refusé');
       } else {
         toast.error('Erreur lors du chargement des commissions');
       }
       setCommissions([]);
+      setStats({
+        total_commission: 0,
+        commission_payee: 0,
+        commission_en_attente: 0
+      });
     } finally {
       setLoading(false);
     }
@@ -95,7 +101,7 @@ export function CommissionEmployeeSection() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Commissions</CardTitle>
@@ -103,7 +109,7 @@ export function CommissionEmployeeSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {stats?.total?.toLocaleString('fr-FR') || 0} Fcfa
+              {(stats?.total_commission || 0).toLocaleString('fr-FR')} Fcfa
             </div>
             <p className="text-xs text-muted-foreground">
               Toutes vos commissions
@@ -113,15 +119,15 @@ export function CommissionEmployeeSection() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reversées</CardTitle>
+            <CardTitle className="text-sm font-medium">Payées</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {stats?.reversees?.toLocaleString('fr-FR') || 0} Fcfa
+              {(stats?.commission_payee || 0).toLocaleString('fr-FR')} Fcfa
             </div>
             <p className="text-xs text-muted-foreground">
-              Commissions payées
+              Commissions versées
             </p>
           </CardContent>
         </Card>
@@ -133,25 +139,10 @@ export function CommissionEmployeeSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {stats?.enAttente?.toLocaleString('fr-FR') || 0} Fcfa
+              {(stats?.commission_en_attente || 0).toLocaleString('fr-FR')} Fcfa
             </div>
             <p className="text-xs text-muted-foreground">
               À recevoir
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Nombre</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats?.nombre || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total de commissions
             </p>
           </CardContent>
         </Card>
@@ -169,47 +160,47 @@ export function CommissionEmployeeSection() {
               <TableRow>
                 <TableHead>Référence Vente</TableHead>
                 <TableHead>Client</TableHead>
-                <TableHead>Date Vente</TableHead>
                 <TableHead>Montant Commission</TableHead>
-                <TableHead>Statut Paiement</TableHead>
-                <TableHead>Date Reversement</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead>Date Versement</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {commissions && commissions.length > 0 ? (
-                commissions.map((commission: any) => (
-                  <TableRow key={commission.id}>
+                commissions.map((commission: any, index: number) => (
+                  <TableRow key={index}>
                     <TableCell className="font-medium">
-                      {commission.vente?.reference || 'N/A'}
+                      {commission.reference_vente || 'N/A'}
                     </TableCell>
                     <TableCell>
-                      {commission.vente?.nom_client || 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      {commission.vente?.created_at 
-                        ? new Date(commission.vente.created_at).toLocaleDateString('fr-FR')
-                        : 'N/A'}
+                      {commission.nom_client || 'N/A'}
                     </TableCell>
                     <TableCell>
                       <div className="font-semibold text-primary">
-                        {parseFloat(commission.montant || 0).toLocaleString('fr-FR')} Fcfa
+                        {parseFloat(commission.montant_commission || 0).toLocaleString('fr-FR')} Fcfa
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={commission.reversee ? "default" : "secondary"}>
-                        {commission.reversee ? "Reversée" : "En attente"}
+                      <Badge variant={commission.etat_commission === 'Payée' ? "default" : "secondary"}>
+                        {commission.etat_commission}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {commission.date_reversement 
-                        ? new Date(commission.date_reversement).toLocaleDateString('fr-FR')
+                      {commission.date_versement 
+                        ? new Date(commission.date_versement).toLocaleDateString('fr-FR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
                         : '-'}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
+                  <TableCell colSpan={5} className="text-center py-12">
                     <DollarSign className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
                     <h3 className="text-lg font-semibold text-muted-foreground mb-2">
                       Aucune commission disponible
