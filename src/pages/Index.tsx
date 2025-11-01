@@ -7,7 +7,7 @@ import { DashboardAdmin } from "@/components/DashboardAdmin";
 import { DashboardEmployee } from "@/components/DashboardEmployee";
 import { DashboardClient } from "@/components/DashboardClient";
 import { ClientsSection } from "@/components/ClientsSection";
-import { PermissionsSection } from "@/components/PermissionSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import { IntermediairesSection } from "@/components/IntermediairesSection";
 import { VentesSection } from "@/components/VentesSection";
 import { FournisseursSection } from "@/components/FournisseursSection";
@@ -17,7 +17,6 @@ import { StockSection } from "@/components/StockSection";
 import { ProfileSection } from "@/components/ProfileSection";
 import { CommissionSection } from "@/components/CommissionsSection";
 import { CommissionEmployeeSection } from "@/components/CommissionEmployeeSection";
-import { SettingsSection } from "@/components/SettingsSection";
 import { UserRole } from "./Auth";
 
 const Index = () => {
@@ -66,8 +65,8 @@ const Index = () => {
       case "personnel":
         return userRole === "admin" ? <PersonnelSection /> : renderDashboard();
 
-      case "permissions":
-        return userRole === "admin" ? <PermissionsSection /> : renderDashboard();
+      case "settings":
+        return userRole === "admin" ? <SettingsSection /> : renderDashboard();
 
       case "fournisseurs":
         return userRole === "admin" ? <FournisseursSection /> : renderDashboard();
@@ -84,8 +83,6 @@ const Index = () => {
         return renderDashboard();
       case "profile":
         return userRole === "admin" || userRole === "employe" ? <ProfileSection userRole={userRole} /> : renderDashboard();
-      case "settings":
-        return <SettingsSection />;
       default:
         return renderDashboard();
     }

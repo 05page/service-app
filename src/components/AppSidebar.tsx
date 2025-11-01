@@ -34,7 +34,7 @@ export function AppSidebar({ activeSection, onSectionChange, userRole }: Sidebar
         // { id: "intermediaires", label: "Intermédiaires", icon: UserCheck },
         { id: "ventes", label: "Ventes", icon: ShoppingCart },
         { id: "personnel", label: "Personnel", icon: Building2 },
-        { id: "permissions", label: "Permissions", icon: Shield },
+        { id: "settings", label: "Paramètres", icon: Settings },
         { id: "fournisseurs", label: "Fournisseurs", icon: Package },
         { id: "achats", label: "Achats", icon: TrendingUp },
         { id: "stock", label: "Stock", icon: Package },

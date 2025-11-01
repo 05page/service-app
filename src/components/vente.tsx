@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus,
   Search,
@@ -23,7 +24,9 @@ import {
   ChevronRight,
   FileText,
   Receipt,
-  CreditCard
+  CreditCard,
+  XCircle,
+  Clock
 } from "lucide-react";
 import { toast } from 'sonner';
 import { RecuPreview } from "./Form/RecuPreview";
@@ -56,6 +59,8 @@ export function VentesSection() {
   const [recuPreviewOpen, setRecuPreviewOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false)
   const [venteDelete, setVendelete] = useState<any | null>(null)
+  const [activeTab, setActiveTab] = useState("all");
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   // États du formulaire de création de vente
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [stock, setStock] = useState([]); // Liste des articles en stock
@@ -208,6 +213,49 @@ export function VentesSection() {
       toast.error(message);
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (venteDelete) {
+      setIsDeleting(true);
+      try {
+        await api.delete(`/ventes/${venteDelete.id}`);
+        await fetchVentesStats();
+        await selectVente();
+        toast.success(`Vente ${venteDelete.reference} supprimée avec succès`);
+        setDeleteDialogOpen(false)
+        setVendelete(null)
+      } catch (error: any) {
+        toast.error("Erreur lors de la suppression");
+        console.error(error.response?.data || error);
+      } finally {
+        setIsDeleting(false)
+      }
+    }
+  }
+
+  const handleCancelVente = async (venteId: number) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir annuler cette vente?')) return;
+    try {
+      await api.put(`/ventes/${venteId}/cancel`);
+      toast.success('Vente annulée avec succès');
+      setDetailDialogOpen(false);
+      await fetchVentesStats();
+      await selectVente();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Erreur lors de l\'annulation');
+      console.error(error);
+    }
+  }
+
+  const fetchPaymentHistory = async (venteId: number) => {
+    try {
+      const response = await api.get(`/ventes/${venteId}/payments`);
+      setPaymentHistory(response.data.data || []);
+    } catch (error: any) {
+      console.error('Erreur récupération historique:', error);
+      setPaymentHistory([]);
     }
   }
 
@@ -405,24 +453,20 @@ export function VentesSection() {
               <FormVente
                 stock={stock}
                 setStock={setStock}
-                stockId={stockId}
-                setStockId={setStockId}
                 client={client}
                 setClient={setClient}
                 numero={numero}
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
-                intermediaire={intermediaire}
-                setIntermediaire={setIntermediaire}
-                quantite={quantite}
-                setQuantite={setQuantite}
-                prixUnitaire={prixUnitaire}
-                setPrixUnitaire={setPrixUnitaire}
-                prixTotal={prixTotal}
-                setPrixTotal={setPrixTotal}
+                commissionaire={intermediaire}
+                setCommissionnire={setIntermediaire}
+                selectCommissionaire={[]}
+                setSelectCommissionaire={() => {}}
                 montant={montant}
                 setMontant={setMontant}
+                items={[]}
+                setItems={() => {}}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -443,24 +487,20 @@ export function VentesSection() {
                 isEdit
                 stock={stock}
                 setStock={setStock}
-                stockId={stockId}
-                setStockId={setStockId}
                 client={client}
                 setClient={setClient}
                 numero={numero}
                 setNumero={setNumero}
                 adresse={adresse}
                 setAdresse={setAdresse}
-                intermediaire={intermediaire}
-                setIntermediaire={setIntermediaire}
-                quantite={quantite}
-                setQuantite={setQuantite}
-                prixUnitaire={prixUnitaire}
-                setPrixUnitaire={setPrixUnitaire}
-                prixTotal={prixTotal}
-                setPrixTotal={setPrixTotal}
+                commissionaire={intermediaire}
+                setCommissionnire={setIntermediaire}
+                selectCommissionaire={[]}
+                setSelectCommissionaire={() => {}}
                 montant={montant}
                 setMontant={setMontant}
+                items={[]}
+                setItems={() => {}}
                 isSubmitting={isSubmitting}
                 setDialogOpen={setDialogOpen}
                 setEditDialogOpen={setEditDialogOpen}
@@ -528,20 +568,30 @@ export function VentesSection() {
         </Card>
       </div>
 
-      {/* Section recherche et filtres */}
+      {/* Section recherche et filtres avec tabs */}
       <Card className="shadow-[var(--shadow-card)]">
         <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher une vente..."
-                className="pl-10"
-              />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex flex-col md:flex-row gap-4 mb-4">
+              <TabsList className="grid w-full md:w-auto grid-cols-4 gap-2">
+                <TabsTrigger value="all">Toutes</TabsTrigger>
+                <TabsTrigger value="attente">En attente</TabsTrigger>
+                <TabsTrigger value="paye">Payées</TabsTrigger>
+                <TabsTrigger value="annule">Annulées</TabsTrigger>
+              </TabsList>
+              <div className="flex gap-2 flex-1">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher une vente..."
+                    className="pl-10"
+                  />
+                </div>
+                <Button variant="outline">Filtres</Button>
+                <Button variant="outline">Exporter</Button>
+              </div>
             </div>
-            <Button variant="outline">Filtres</Button>
-            <Button variant="outline">Exporter</Button>
-          </div>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -549,7 +599,15 @@ export function VentesSection() {
       <div className="grid gap-6">
         {selectVentes && selectVentes.length > 0 ? (
           <>
-            {currentVentes.map((vente: any) => (
+            {currentVentes
+              .filter((vente: any) => {
+                if (activeTab === "all") return true;
+                if (activeTab === "attente") return vente.statut === "En attente";
+                if (activeTab === "paye") return vente.statut === "Payé";
+                if (activeTab === "annule") return vente.statut === "Annulé";
+                return true;
+              })
+              .map((vente: any) => (
               <Card key={vente.id} className="shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
                 {/* Détails de la vente */}
                 <CardHeader>
@@ -560,12 +618,12 @@ export function VentesSection() {
                       </div>
                       <div>
                         <CardTitle className="text-lg">Vente {vente.reference}</CardTitle>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                          <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1 flex-wrap">
+                          <div className="flex items-center gap-1 whitespace-nowrap">
                             <Calendar className="h-3 w-3" />
                             {new Date(vente.created_at).toLocaleDateString('fr-FR')}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 whitespace-nowrap">
                             <User className="h-3 w-3" />
                             {vente.nom_client}
                           </div>
@@ -577,12 +635,14 @@ export function VentesSection() {
                     <Badge
                       variant={
                         vente.statut === "Payé" ? "default" :
-                          vente.statut === "En attente" ? "secondary" :
-                            "outline"
+                        vente.statut === "En attente" ? "secondary" :
+                        vente.statut === "Annulé" ? "destructive" :
+                        "outline"
                       }
                       className={
                         vente.statut === "Payé" ? "bg-success text-success-foreground" :
-                          vente.statut === "En attente" ? "bg-warning text-warning-foreground" : ""
+                        vente.statut === "En attente" ? "bg-warning text-warning-foreground" : 
+                        vente.statut === "Annulé" ? "bg-destructive text-destructive-foreground" : ""
                       }
                     >
                       {vente.statut}
@@ -621,6 +681,7 @@ export function VentesSection() {
                         variant="outline" 
                         onClick={() => {
                           setSelectedVente(vente);
+                          fetchPaymentHistory(vente.id);
                           setDetailDialogOpen(true);
                         }}
                       >
@@ -755,7 +816,7 @@ export function VentesSection() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Statut</p>
-                  <Badge variant={selectedVente.statut === 'Payé' ? 'default' : 'destructive'} className="mt-1">
+                  <Badge variant={selectedVente.statut === 'Payé' ? 'default' : selectedVente.statut === 'Annulé' ? 'destructive' : 'secondary'} className="mt-1">
                     {selectedVente.statut || 'En attente'}
                   </Badge>
                 </div>
@@ -765,27 +826,54 @@ export function VentesSection() {
                 </div>
               </div>
 
+              {/* Historique des paiements */}
+              {selectedVente.statut !== 'Annulé' && paymentHistory.length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Historique des paiements
+                  </h3>
+                  <div className="space-y-2">
+                    {paymentHistory.map((payment: any, index: number) => (
+                      <div key={index} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                        <div>
+                          <p className="font-medium">{payment.montant} Fcfa</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(payment.created_at).toLocaleString('fr-FR')}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{payment.mode_paiement || 'Espèces'}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="border-t pt-4">
                 <h3 className="font-semibold mb-3">Actions disponibles</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" className="justify-start" onClick={() => {
-                    setDetailDialogOpen(false);
-                    handleEdit(selectedVente);
-                  }}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Modifier la vente
-                  </Button>
+                  {selectedVente.statut !== 'Annulé' && (
+                    <Button variant="outline" className="justify-start" onClick={() => {
+                      setDetailDialogOpen(false);
+                      handleEdit(selectedVente);
+                    }}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Modifier la vente
+                    </Button>
+                  )}
                   
                   {selectedVente.statut === 'Payé' ? (
                     <Button variant="outline" className="justify-start" onClick={() => handleDownloadFacture(selectedVente.id)}>
                       <FileText className="h-4 w-4 mr-2" />
                       Télécharger facture
                     </Button>
-                  ) : (
+                  ) : selectedVente.statut !== 'Annulé' ? (
                     <>
-                      <Button variant="outline" className="justify-start" onClick={() => setRecuPreviewOpen(true)}>
+                      <Button variant="outline" className="justify-start" onClick={() => {
+                        handleDownloadFacture(selectedVente.id, true);
+                      }}>
                         <Receipt className="h-4 w-4 mr-2" />
-                        Aperçu du reçu
+                        Télécharger reçu
                       </Button>
                       <Button variant="outline" className="justify-start col-span-2" onClick={() => {
                         setDetailDialogOpen(false);
@@ -795,6 +883,13 @@ export function VentesSection() {
                         Ajouter un règlement
                       </Button>
                     </>
+                  ) : null}
+
+                  {selectedVente.statut !== 'Annulé' && (
+                    <Button variant="destructive" className="justify-start col-span-2" onClick={() => handleCancelVente(selectedVente.id)}>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Annuler la vente
+                    </Button>
                   )}
                 </div>
               </div>

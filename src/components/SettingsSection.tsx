@@ -1,441 +1,397 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from '../api/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Settings, 
-  Building, 
-  Users, 
-  Bell, 
-  Shield, 
-  Database,
-  Palette,
-  Save,
-  RefreshCw,
-  Download,
-  Upload
-} from "lucide-react";
+import { RefreshCw, Plus, Shield, User, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
+import { usePagination } from "@/hooks/usePagination";
+
+interface Permission {
+  id: number;
+  user_id: number;
+  description: string;
+  module: string;
+  active: boolean;
+  fullname?: string;
+  email?: string;
+  role?: string;
+}
+
+interface Employee {
+  id: number;
+  fullname: string;
+  email: string;
+  role: string;
+}
+
+const availableModules = [
+  { value: "clients", label: "Clients", description: "Gestion des clients" },
+  { value: "ventes", label: "Ventes", description: "Gestion des ventes" },
+  { value: "stock", label: "Stock", description: "Gestion du stock" },
+  { value: "achats", label: "Achats", description: "Gestion des achats" },
+  { value: "fournisseurs", label: "Fournisseurs", description: "Gestion des fournisseurs" },
+  { value: "commissions", label: "Commissions", description: "Consultation des commissions" }
+];
 
 export function SettingsSection() {
-  const [activeTab, setActiveTab] = useState("general");
-  const [settings, setSettings] = useState({
-    companyName: "Entreprise Commerciale SARL",
-    companyAddress: "123 Rue du Commerce, 75001 Paris",
-    companyPhone: "+33 1 23 45 67 89",
-    companyEmail: "contact@entreprise.com",
-    currency: "EUR",
-    language: "fr",
-    timezone: "Europe/Paris",
-    notifications: {
-      email: true,
-      sms: false,
-      push: true,
-      stockAlerts: true,
-      paymentReminders: true
-    },
-    commissions: {
-      defaultRate: 5,
-      autoCalculate: true,
-      paymentFrequency: "monthly"
-    },
-    security: {
-      twoFactor: false,
-      sessionTimeout: 30,
-      passwordPolicy: "medium"
+  const [searchTerm, setSearchTerm] = useState("");
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedModule, setSelectedModule] = useState("");
+  const [description, setDescription] = useState("");
+
+  const fetchPermissions = async () => {
+    try {
+      const response = await api.get('/permissions/');
+      setPermissions(response.data.data || []);
+    } catch (error: any) {
+      console.error('Erreur récupération permissions:', error);
+      toast.error('Erreur lors du chargement des autorisations');
     }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const response = await api.get('/admin/showEmploye');
+      setEmployees(response.data.data || []);
+    } catch (error: any) {
+      console.error('Erreur récupération employés:', error);
+      toast.error('Erreur lors du chargement des employés');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchPermissions(), fetchEmployees()]);
+      toast.success('Données actualisées');
+    } catch (error) {
+      toast.error('Erreur lors de l\'actualisation');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmployee || !selectedModule) {
+      toast.error('Veuillez sélectionner un employé et un module');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await api.post('/permissions/', {
+        user_id: parseInt(selectedEmployee),
+        module: selectedModule,
+        description: description || `Accès au module ${selectedModule}`
+      });
+      toast.success(response.data.message || 'Autorisation créée avec succès');
+      setDialogOpen(false);
+      resetForm();
+      fetchPermissions();
+    } catch (error: any) {
+      console.error('Erreur création autorisation:', error.response?.data);
+      toast.error(error.response?.data?.message || "Erreur lors de la création");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleTogglePermission = async (permissionId: number, currentStatus: boolean) => {
+    try {
+      await api.put(`/permissions/${permissionId}`, {
+        active: !currentStatus
+      });
+      toast.success(`Autorisation ${!currentStatus ? 'activée' : 'désactivée'}`);
+      fetchPermissions();
+    } catch (error: any) {
+      console.error('Erreur toggle permission:', error);
+      toast.error('Erreur lors de la modification du statut');
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedEmployee("");
+    setSelectedModule("");
+    setDescription("");
+  };
+
+  useEffect(() => {
+    fetchPermissions();
+    fetchEmployees();
+  }, []);
+
+  const groupedPermissions = permissions.reduce((acc: any, permission) => {
+    if (!acc[permission.user_id]) {
+      acc[permission.user_id] = {
+        user: {
+          id: permission.user_id,
+          fullname: permission.fullname,
+          email: permission.email,
+          role: permission.role
+        },
+        permissions: []
+      };
+    }
+    acc[permission.user_id].permissions.push(permission);
+    return acc;
+  }, {});
+
+  const filteredGroupedPermissions = Object.values(groupedPermissions).filter((group: any) => {
+    if (!searchTerm) return true;
+    return (
+      group.user.fullname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      group.user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
   });
 
-  const handleSave = () => {
-    // Logique de sauvegarde
-    console.log("Sauvegarde des paramètres:", settings);
-  };
+  const {
+    currentData: paginatedPermissions,
+    currentPage,
+    totalPages,
+    goToNextPage,
+    goToPreviousPage,
+    goToPage
+  } = usePagination({ data: filteredGroupedPermissions, itemsPerPage: 6 });
 
-  const handleInputChange = (section: string, field: string, value: any) => {
-    setSettings(prev => {
-      const sectionData = prev[section as keyof typeof prev] as any;
-      return {
-        ...prev,
-        [section]: {
-          ...sectionData,
-          [field]: value
-        }
-      };
-    });
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Chargement des autorisations...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Paramètres</h1>
-          <p className="text-muted-foreground">
-            Configurez les paramètres de votre application de gestion commerciale
-          </p>
+          <p className="text-muted-foreground">Gérez les autorisations d'accès aux modules</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Réinitialiser
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualiser
           </Button>
-          <Button onClick={handleSave}>
-            <Save className="mr-2 h-4 w-4" />
-            Sauvegarder
-          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Attribuer une autorisation
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nouvelle autorisation</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee">Employé *</Label>
+                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un employé" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id.toString()}>
+                          {emp.fullname} ({emp.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="module">Module *</Label>
+                  <Select value={selectedModule} onValueChange={setSelectedModule} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un module" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableModules.map((mod) => (
+                        <SelectItem key={mod.value} value={mod.value}>
+                          {mod.label} - {mod.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Description de l'autorisation..."
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      resetForm();
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <span className="flex items-center">
+                        <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                        Attribution...
+                      </span>
+                    ) : (
+                      "Attribuer"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="general">
-            <Building className="mr-2 h-4 w-4" />
-            Général
-          </TabsTrigger>
-          <TabsTrigger value="users">
-            <Users className="mr-2 h-4 w-4" />
-            Utilisateurs
-          </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="mr-2 h-4 w-4" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="commissions">
-            <Settings className="mr-2 h-4 w-4" />
-            Commissions
-          </TabsTrigger>
-          <TabsTrigger value="security">
+      <Tabs defaultValue="autorisations" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-1">
+          <TabsTrigger value="autorisations">
             <Shield className="mr-2 h-4 w-4" />
-            Sécurité
-          </TabsTrigger>
-          <TabsTrigger value="backup">
-            <Database className="mr-2 h-4 w-4" />
-            Sauvegarde
+            Autorisations
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Informations de l'entreprise</CardTitle>
-              <CardDescription>
-                Configurez les informations générales de votre entreprise
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Nom de l'entreprise</Label>
-                  <Input
-                    id="companyName"
-                    value={settings.companyName}
-                    onChange={(e) => setSettings(prev => ({...prev, companyName: e.target.value}))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="companyEmail">Email</Label>
-                  <Input
-                    id="companyEmail"
-                    type="email"
-                    value={settings.companyEmail}
-                    onChange={(e) => setSettings(prev => ({...prev, companyEmail: e.target.value}))}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="companyAddress">Adresse</Label>
-                <Textarea
-                  id="companyAddress"
-                  value={settings.companyAddress}
-                  onChange={(e) => setSettings(prev => ({...prev, companyAddress: e.target.value}))}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Devise</Label>
-                  <Select value={settings.currency} onValueChange={(value) => setSettings(prev => ({...prev, currency: value}))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EUR">Euro (€)</SelectItem>
-                      <SelectItem value="USD">Dollar US ($)</SelectItem>
-                      <SelectItem value="GBP">Livre Sterling (£)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="language">Langue</Label>
-                  <Select value={settings.language} onValueChange={(value) => setSettings(prev => ({...prev, language: value}))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fr">Français</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Español</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Fuseau horaire</Label>
-                  <Select value={settings.timezone} onValueChange={(value) => setSettings(prev => ({...prev, timezone: value}))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Europe/Paris">Paris (UTC+1)</SelectItem>
-                      <SelectItem value="Europe/London">Londres (UTC+0)</SelectItem>
-                      <SelectItem value="America/New_York">New York (UTC-5)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <TabsContent value="autorisations" className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher un employé..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
 
-        <TabsContent value="users" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gestion des utilisateurs</CardTitle>
-              <CardDescription>
-                Gérez les comptes utilisateurs et leurs permissions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Fonctionnalité de gestion des utilisateurs en cours de développement...
-              </p>
-              <Button variant="outline">
-                <Users className="mr-2 h-4 w-4" />
-                Gérer les utilisateurs
+          {paginatedPermissions.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Shield className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Aucune autorisation</h3>
+                <p className="text-sm text-muted-foreground text-center mb-4">
+                  Commencez par attribuer des autorisations à vos employés
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {paginatedPermissions.map((group: any) => (
+                <Card key={group.user.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{group.user.fullname}</CardTitle>
+                          <CardDescription className="text-sm">
+                            {group.user.email}
+                          </CardDescription>
+                          <Badge variant="outline" className="mt-1">
+                            {group.user.role}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="space-y-2">
+                      {group.permissions.map((perm: Permission) => (
+                        <div
+                          key={perm.id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-primary" />
+                            <div>
+                              <p className="font-medium text-sm">{perm.module}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {perm.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {perm.active ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-600" />
+                            )}
+                            <Switch
+                              checked={perm.active}
+                              onCheckedChange={() =>
+                                handleTogglePermission(perm.id, perm.active)
+                              }
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center space-x-2 mt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Préférences de notification</CardTitle>
-              <CardDescription>
-                Configurez comment vous souhaitez recevoir les notifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Notifications email</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Recevoir les notifications par email
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.notifications.email}
-                    onCheckedChange={(checked) => handleInputChange('notifications', 'email', checked)}
-                  />
-                </div>
-                
-                <Separator />
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Notifications SMS</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Recevoir les notifications par SMS
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.notifications.sms}
-                    onCheckedChange={(checked) => handleInputChange('notifications', 'sms', checked)}
-                  />
-                </div>
-                
-                <Separator />
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Alertes de stock</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Être notifié quand le stock est bas
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.notifications.stockAlerts}
-                    onCheckedChange={(checked) => handleInputChange('notifications', 'stockAlerts', checked)}
-                  />
-                </div>
-                
-                <Separator />
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Rappels de paiement</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Rappels pour les factures impayées
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.notifications.paymentReminders}
-                    onCheckedChange={(checked) => handleInputChange('notifications', 'paymentReminders', checked)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="commissions" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Paramètres des commissions</CardTitle>
-              <CardDescription>
-                Configurez les règles de calcul des commissions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="defaultRate">Taux par défaut (%)</Label>
-                  <Input
-                    id="defaultRate"
-                    type="number"
-                    value={settings.commissions.defaultRate}
-                    onChange={(e) => handleInputChange('commissions', 'defaultRate', Number(e.target.value))}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="paymentFrequency">Fréquence de paiement</Label>
-                  <Select 
-                    value={settings.commissions.paymentFrequency} 
-                    onValueChange={(value) => handleInputChange('commissions', 'paymentFrequency', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekly">Hebdomadaire</SelectItem>
-                      <SelectItem value="monthly">Mensuel</SelectItem>
-                      <SelectItem value="quarterly">Trimestriel</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Calcul automatique</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Calculer automatiquement les commissions
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.commissions.autoCalculate}
-                  onCheckedChange={(checked) => handleInputChange('commissions', 'autoCalculate', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Paramètres de sécurité</CardTitle>
-              <CardDescription>
-                Configurez les paramètres de sécurité de l'application
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Authentification à deux facteurs</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Ajouter une couche de sécurité supplémentaire
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.security.twoFactor}
-                  onCheckedChange={(checked) => handleInputChange('security', 'twoFactor', checked)}
-                />
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-2">
-                <Label htmlFor="sessionTimeout">Timeout de session (minutes)</Label>
-                <Input
-                  id="sessionTimeout"
-                  type="number"
-                  value={settings.security.sessionTimeout}
-                  onChange={(e) => handleInputChange('security', 'sessionTimeout', Number(e.target.value))}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="passwordPolicy">Politique de mot de passe</Label>
-                <Select 
-                  value={settings.security.passwordPolicy} 
-                  onValueChange={(value) => handleInputChange('security', 'passwordPolicy', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Faible</SelectItem>
-                    <SelectItem value="medium">Moyenne</SelectItem>
-                    <SelectItem value="high">Élevée</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="backup" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sauvegarde et restauration</CardTitle>
-              <CardDescription>
-                Gérez les sauvegardes de vos données
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col space-y-4">
-                <div className="flex justify-between items-center p-4 border rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Sauvegarde automatique</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Dernière sauvegarde: Il y a 2 heures
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Button variant="outline">
-                    <Download className="mr-2 h-4 w-4" />
-                    Télécharger sauvegarde
-                  </Button>
-                  <Button variant="outline">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Restaurer sauvegarde
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} sur {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
