@@ -56,6 +56,10 @@ export function AchatsSection() {
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
 
+  // États supplémentaires à ajouter
+  const [existingPhotos, setExistingPhotos] = useState<any[]>([]); // Photos existantes de la BDD
+  const [photosToDelete, setPhotosToDelete] = useState<number[]>([]); // IDs des photos à supprimer
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [achatDelete, setAchatDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -124,64 +128,6 @@ export function AchatsSection() {
     }
   }
 
-  // Gestion des photos
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const newFiles = Array.from(files);
-    const totalPhotos = photoFiles.length + newFiles.length;
-
-    if (totalPhotos > 4) {
-      toast.error('Vous ne pouvez ajouter que 4 photos maximum');
-      return;
-    }
-
-    // Vérifier la taille et le type de chaque fichier
-    const validFiles = newFiles.filter(file => {
-      if (file.size > 2048 * 1024) {
-        toast.error(`${file.name} est trop volumineux (max 2MB)`);
-        return false;
-      }
-      if (!['image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(file.type)) {
-        toast.error(`${file.name} n'est pas un format valide`);
-        return false;
-      }
-      return true;
-    });
-
-    if (validFiles.length === 0) return;
-
-    setPhotoFiles(prev => [...prev, ...validFiles]);
-
-    // Créer les previews
-    validFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreviews(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removePhoto = (index: number) => {
-    setPhotoFiles(prev => prev.filter((_, i) => i !== index));
-    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const resetForm = () => {
-    setFournisseurId("");
-    setTypeService("");
-    setQuantite("");
-    setPrixUnitaire("");
-    setDateCommande("");
-    setDateLivraison("");
-    setStatut("");
-    setDescription("");
-    setPhotoFiles([]);
-    setPhotoPreviews([]);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fournisseurId || !typeService || !quantite || !prixUnitaire || !dateCommande || !statut) {
@@ -224,6 +170,50 @@ export function AchatsSection() {
       setIsSubmitting(false)
     }
   }
+  // Gestion des photos existantes et nouvelles
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files);
+    const totalPhotos = existingPhotos.length - photosToDelete.length + photoFiles.length + newFiles.length;
+
+    if (totalPhotos > 4) {
+      toast.error('Vous ne pouvez avoir que 4 photos maximum');
+      return;
+    }
+
+    // Vérifier la taille et le type de chaque fichier
+    const validFiles = newFiles.filter(file => {
+      if (file.size > 2048 * 1024) {
+        toast.error(`${file.name} est trop volumineux (max 2MB)`);
+        return false;
+      }
+      if (!['image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(file.type)) {
+        toast.error(`${file.name} n'est pas un format valide`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setPhotoFiles(prev => [...prev, ...validFiles]);
+
+    // Créer les previews
+    const newPreviews = validFiles.map(file => URL.createObjectURL(file));
+    setPhotoPreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Supprimer une photo existante (marquer pour suppression)
+  const removeExistingPhoto = (photoId: number) => {
+    setPhotosToDelete(prev => [...prev, photoId]);
+  };
 
   const handleEdit = (upAchat: any) => {
     setSelectAchat(upAchat);
@@ -235,41 +225,105 @@ export function AchatsSection() {
     setDateLivraison(upAchat.date_livraison || "");
     setStatut(upAchat.statut || "");
     setDescription(upAchat.description || "");
+    // Charger les photos existantes
+    const photos = upAchat.photos || [];
+    setExistingPhotos(upAchat.photos || []);
+    setPhotosToDelete([]);
+    setPhotoFiles([]);
+    // Construire les previews pour affichage
+    const previews = photos.map(photo => photo.path); // utiliser directement le path reçu du backend
+    setPhotoPreviews(previews);
     setEditDialogOpen(true);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectAchat) return;
+
     if (!fournisseurId || !typeService || !quantite || !prixUnitaire || !dateCommande || !statut) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
+    // Vérifier le nombre total de photos
+    const totalPhotos = existingPhotos.length - photosToDelete.length + photoFiles.length;
+    if (totalPhotos > 4) {
+      toast.error('Vous ne pouvez avoir que 4 photos maximum');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const response = await api.put(`/achat/${selectAchat.id}`, {
-        fournisseur_id: fournisseurId,
-        nom_service: typeService,
-        quantite,
-        prix_unitaire: prixUnitaire,
-        date_commande: dateCommande,
-        date_livraison: dateLivraison,
-        statut
-      })
+      const formData = new FormData();
+
+      // Ajouter les données de base
+      formData.append('fournisseur_id', fournisseurId);
+      formData.append('nom_service', typeService);
+      formData.append('quantite', quantite);
+      formData.append('prix_unitaire', prixUnitaire);
+      formData.append('date_commande', dateCommande);
+      if (dateLivraison) formData.append('date_livraison', dateLivraison);
+      formData.append('statut', statut);
+      if (description) formData.append('description', description);
+
+      // Ajouter les nouvelles photos
+      photoFiles.forEach((file, index) => {
+        formData.append('photos[]', file);
+      });
+
+      // Ajouter les IDs des photos à supprimer
+      if (photosToDelete.length > 0) {
+        formData.append('photos_to_delete', JSON.stringify(photosToDelete));
+      }
+
+      const response = await api.post(`/achat/${selectAchat.id}?_method=PUT`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
       toast.success(response.data.message || "Achat mis à jour");
-      setEditDialogOpen(false)
+      setEditDialogOpen(false);
       resetForm();
       await fecthAchats();
       await getAchats();
     } catch (error: any) {
-      console.error(error.response.data);
-      const message = error?.response?.data?.message || "Erreur survenu lors de mise à jour de l'achat"
-      toast.error(message)
-    }finally{
-      setIsSubmitting(false)
+      console.error(error.response?.data);
+      const message = error?.response?.data?.message || "Erreur survenue lors de la mise à jour de l'achat";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
     }
-  }
+  };
+
+  const resetForm = () => {
+    setFournisseurId("");
+    setTypeService("");
+    setQuantite("");
+    setPrixUnitaire("");
+    setDateCommande("");
+    setDateLivraison("");
+    setStatut("");
+    setDescription("");
+    setPhotoFiles([]);
+    setPhotoPreviews([]);
+    setExistingPhotos([]);
+    setPhotosToDelete([]);
+    setSelectAchat(null);
+  };
+
+  // Navigation dans la galerie
+  const nextPhoto = () => {
+    if (detail?.photos && currentPhotoIndex < detail.photos.length - 1) {
+      setCurrentPhotoIndex(prev => prev + 1);
+    }
+  };
+
+  const prevPhoto = () => {
+    if (currentPhotoIndex > 0) {
+      setCurrentPhotoIndex(prev => prev - 1);
+    }
+  };
 
   const handleClick = (achat: any) => {
     setAchatDelete(achat);
@@ -325,19 +379,6 @@ export function AchatsSection() {
       }
     }
   }
-
-  // Navigation dans la galerie
-  const nextPhoto = () => {
-    if (detail?.photos && currentPhotoIndex < detail.photos.length - 1) {
-      setCurrentPhotoIndex(prev => prev + 1);
-    }
-  };
-
-  const prevPhoto = () => {
-    if (currentPhotoIndex > 0) {
-      setCurrentPhotoIndex(prev => prev - 1);
-    }
-  };
 
   const openDetailDialog = (achat: any) => {
     setDetail(achat);
@@ -597,7 +638,6 @@ export function AchatsSection() {
             </DialogContent>
           </Dialog>
 
-          {/* Dialog Edit - similaire mais avec gestion des photos existantes */}
           <Dialog open={editDialogOpen} onOpenChange={(open) => {
             setEditDialogOpen(open);
             if (!open) resetForm();
@@ -652,6 +692,63 @@ export function AchatsSection() {
                   <div className="col-span-2 space-y-2">
                     <Label>Description</Label>
                     <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+                  </div>
+                  {/* Section Photos */}
+                  <div className="col-span-2 space-y-2">
+                    <Label>Photos (Maximum 4)</Label>
+                    {/* Zone d'ajout de nouvelles photos */}
+                    <div className="border-2 border-dashed rounded-lg p-4">
+                      <input
+                        type="file"
+                        id="photos-edit"
+                        accept="image/jpeg,image/png,image/jpg,image/webp"
+                        multiple
+                        onChange={handlePhotoChange}
+                        className="hidden"
+                        disabled={
+                          existingPhotos.length - photosToDelete.length + photoFiles.length >= 4
+                        }
+                      />
+                      <label
+                        htmlFor="photos-edit"
+                        className={`flex flex-col items-center justify-center cursor-pointer ${existingPhotos.length - photosToDelete.length + photoFiles.length >= 4
+                          ? 'opacity-50 cursor-not-allowed'
+                          : ''
+                          }`}
+                      >
+                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                        <span className="text-sm text-muted-foreground">
+                          Ajouter des photos ({existingPhotos.length - photosToDelete.length + photoFiles.length}/4)
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          JPEG, PNG, JPG, WEBP (max 2MB)
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Preview des nouvelles photos */}
+                    {photoPreviews.length > 0 && (
+                      <div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {photoPreviews.map((preview, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={preview}
+                                alt={`Nouvelle photo ${index + 1}`}
+                                className="w-full h-24 object-cover rounded"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(index)}
+                                className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
@@ -893,11 +990,6 @@ export function AchatsSection() {
                           >
                             <ChevronRight className="h-5 w-5" />
                           </button>
-
-                          {/* Indicateur de photos */}
-                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
-                            {currentPhotoIndex + 1} / {detail.photos.length}
-                          </div>
                         </>
                       )}
 
@@ -909,8 +1001,8 @@ export function AchatsSection() {
                               key={index}
                               onClick={() => setCurrentPhotoIndex(index)}
                               className={`relative h-16 w-16 rounded overflow-hidden border-2 transition-all ${currentPhotoIndex === index
-                                  ? 'border-primary ring-2 ring-primary'
-                                  : 'border-transparent hover:border-muted-foreground'
+                                ? 'border-primary ring-2 ring-primary'
+                                : 'border-transparent hover:border-muted-foreground'
                                 }`}
                             >
                               <img

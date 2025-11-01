@@ -38,6 +38,7 @@ export const DashboardEmployee = () => {
 
   // States pour gérer les données et l'état du composant
   const [myStats, setMyStats] = useState<VentesStats | null>(null); // Statistiques de l'employé
+  const [myCommissions, setMyCommissions] = useState<any>(null)
   const [lastStat, setLastStat] = useState([]);                     // Derniers clients ou ventes
   const [loading, setLoading] = useState(true);                     // État de chargement initial
   const [refreshing, setRefreshing] = useState(false);              // État pour le rafraîchissement manuel
@@ -47,7 +48,7 @@ export const DashboardEmployee = () => {
     try {
       // On récupère le token dans le localStorage
       const token = localStorage.getItem("token");
-      
+      console.log(token)
       // Si pas de token, on redirige vers la page de connexion
       if (!token) {
         console.error('Pas de token trouvé');
@@ -57,10 +58,10 @@ export const DashboardEmployee = () => {
 
       // Requête API pour récupérer les statistiques de l'utilisateur
       const response = await api.get('/ventes/myStats');
-      setMyStats(response.data.data); // On stocke les stats dans le state
-
+      console.log(response.data.data)
+      setMyStats(response.data.data)
       // Requête API pour récupérer toutes les ventes
-      const responses = await api.get('/ventes');
+      const responses = await api.get('/ventes/myVentes');
       if (responses.data.success && responses.data.data) {
         console.log('Nombre de ventes récupérés:', responses.data.data.length);
         setLastStat(responses.data.data); // On stocke les ventes dans le state
@@ -85,6 +86,20 @@ export const DashboardEmployee = () => {
     }
   }
 
+  //Récupérer les commision
+  const mesCommissions = async () => {
+    try {
+      const response = await api.get('commissions/mesCommissions');
+      setMyCommissions(response.data.resume);
+      console.log(response.data.resume);
+    } catch (error: any) {
+      console.error(error?.response?.data?.message || "Erreur de récupération");
+      toast.error(error?.response?.data?.message || "Erreur de récupération");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fonction pour rafraîchir manuellement les données
   const handleRefresh = async () => {
     setRefreshing(true); // On active l'état de rafraîchissement
@@ -101,6 +116,7 @@ export const DashboardEmployee = () => {
   // useEffect qui se déclenche au montage du composant pour charger les stats
   useEffect(() => {
     getMyStats();
+    mesCommissions();
   }, []);
 
   // Affichage pendant le chargement
@@ -222,7 +238,7 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {myStats?.total_commissions?.toLocaleString() || 0} Fcfa
+              {myStats?.total_commissions?.toLocaleString() || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Total gagné
@@ -242,7 +258,7 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {myStats?.commissions_reversees?.toLocaleString() || 0} Fcfa
+              {myCommissions?.total_commission?.toLocaleString() || 0} Fcfa
             </div>
             <p className="text-xs text-muted-foreground">
               Déjà reçues
@@ -259,7 +275,7 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {myStats?.commissions_en_attente?.toLocaleString() || 0} Fcfa
+              {myCommissions?.commission_en_attente?.toLocaleString() || 0} Fcfa
             </div>
             <p className="text-xs text-muted-foreground">
               À recevoir
@@ -287,8 +303,8 @@ export const DashboardEmployee = () => {
             {lastStat && lastStat.length > 0 ? (
               <div className="space-y-3">
                 {lastStat.slice(0, 5).map((lastClient: any) => (
-                  <div 
-                    key={lastClient.id} 
+                  <div
+                    key={lastClient.id}
                     className="flex justify-between items-center p-3 border border-border rounded-lg hover:bg-muted/30 transition-colors"
                   >
                     <div className="flex items-center gap-3">
@@ -306,7 +322,7 @@ export const DashboardEmployee = () => {
                       </div>
                     </div>
                     <Badge variant="secondary">
-                      {new Date(lastClient.created_at).toLocaleDateString('fr-FR')} {/* Date format FR */}
+                      {lastClient.created_at} {/* Date format FR */}
                     </Badge>
                   </div>
                 ))}
@@ -343,8 +359,8 @@ export const DashboardEmployee = () => {
             {lastStat && lastStat.length > 0 ? (
               <div className="space-y-3">
                 {lastStat.slice(0, 5).map((last: any) => (
-                  <div 
-                    key={last.id} 
+                  <div
+                    key={last.id}
                     className="flex justify-between items-center p-3 border border-border rounded-lg hover:bg-muted/30 transition-colors"
                   >
                     <div className="flex items-center gap-3">
@@ -360,16 +376,16 @@ export const DashboardEmployee = () => {
                         </p>
                       </div>
                     </div>
-                    <Badge 
+                    <Badge
                       variant={
                         last?.statut === "Payé" ? "default" :
-                        last?.statut === "En attente" ? "secondary" :
-                        "outline"
+                          last?.statut === "En attente" ? "secondary" :
+                            "outline"
                       }
                       className={
                         last?.statut === "Payé" ? "bg-green-600 text-white" :
-                        last?.statut === "En attente" ? "bg-orange-600 text-white" :
-                        ""
+                          last?.statut === "En attente" ? "bg-orange-600 text-white" :
+                            ""
                       }
                     >
                       {last?.statut || "Inconnu"} {/* Affiche statut vente */}

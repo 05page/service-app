@@ -52,6 +52,7 @@ export function VentesSection() {
   const [venteDelete, setVendelete] = useState<any | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const [searchTerm, setSearchTerm] = useState("");
   const [stock, setStock] = useState([]);
   const [client, setClient] = useState("");
   const [numero, setNumero] = useState("");
@@ -289,7 +290,7 @@ export function VentesSection() {
     try {
       toast.info('Génération de facture en cours...');
 
-      const response = await api.get(`factures/vente/${venteId}/pdf`, {
+      const response = await api.get(`factures/vente/${venteId}/document`, {
         responseType: 'blob'
       });
 
@@ -404,10 +405,16 @@ export function VentesSection() {
   }, [])
 
   const filteredVentes = selectVentes.filter((v: any) => {
-    if (filterTab === "all") return true;
-    if (filterTab === "regle") return v.est_soldee === true;
-    if (filterTab === "non_regle") return v.est_soldee === false;
-    return true;
+    const matchSearch =
+      searchTerm === "" ||
+      v.nom_client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.reference.toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchFilter = true;
+    if (filterTab === "regle") matchFilter = v.est_soldee === true;
+    if (filterTab === "non_regle") matchFilter = v.est_soldee === false;
+
+    return matchSearch && matchFilter;
   });
 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -759,7 +766,7 @@ export function VentesSection() {
                 <CardTitle>Liste des ventes</CardTitle>
                 <div className="relative w-64">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Rechercher..." className="pl-10" />
+                  <Input placeholder="Rechercher..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
               </div>
             </CardHeader>
