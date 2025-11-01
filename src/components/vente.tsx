@@ -327,22 +327,7 @@ export function VentesSection() {
     setVendelete(v)
     setDeleteDialogOpen(true)
   }
-  const handleDelete = async () => {
-    if (venteDelete) {
-      try {
-        await api.delete(`ventes/${venteDelete.id}`);
-        await Promise.all([fetchVentesStats(), selectVente()]);
-        toast.success(`Vente ${venteDelete?.reference} supprimé avec succès`)
-        setDeleteDialogOpen(false);
-        setVendelete(null);
-      } catch (error: any) {
-        toast.error("Erreur lors de la suppression");
-        console.error(error.response?.data || error);
-      } finally {
-        setIsDeleting(false)
-      }
-    }
-  }
+  
   // useEffect pour initialiser les données
   useEffect(() => {
     fetchVentesStats()
