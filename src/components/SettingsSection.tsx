@@ -20,6 +20,13 @@ interface Permission {
   description: string;
   module: string;
   active: boolean;
+  created_at?: string;
+  employe?: {
+    id: number;
+    fullname: string;
+    email: string;
+    role: string;
+  };
   fullname?: string;
   email?: string;
   role?: string;
@@ -55,11 +62,24 @@ export function SettingsSection() {
 
   const fetchPermissions = async () => {
     try {
-      const response = await api.get('/permissions/');
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error('Token non trouvé');
+        return;
+      }
+
+      const response = await api.get('admin/showPermissions/');
       setPermissions(response.data.data || []);
     } catch (error: any) {
       console.error('Erreur récupération permissions:', error);
-      toast.error('Erreur lors du chargement des autorisations');
+      if (error.response?.status === 401) {
+        toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
+      } else if (error.response?.status === 403) {
+        toast.error('Accès refusé');
+      } else {
+        toast.error('Erreur lors du chargement des autorisations');
+      }
+      setPermissions([]);
     }
   };
 
@@ -70,6 +90,7 @@ export function SettingsSection() {
     } catch (error: any) {
       console.error('Erreur récupération employés:', error);
       toast.error('Erreur lors du chargement des employés');
+      setEmployees([]);
     } finally {
       setLoading(false);
     }
@@ -89,39 +110,47 @@ export function SettingsSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!selectedEmployee || !selectedModule) {
       toast.error('Veuillez sélectionner un employé et un module');
       return;
     }
+
+    if (!description) {
+      toast.error('Veuillez fournir une description');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const response = await api.post('/permissions/', {
+      const response = await api.post('admin/createPermission/', {
         user_id: parseInt(selectedEmployee),
         module: selectedModule,
-        description: description || `Accès au module ${selectedModule}`
+        description: description
       });
       toast.success(response.data.message || 'Autorisation créée avec succès');
       setDialogOpen(false);
       resetForm();
-      fetchPermissions();
+      await fetchPermissions();
     } catch (error: any) {
       console.error('Erreur création autorisation:', error.response?.data);
-      toast.error(error.response?.data?.message || "Erreur lors de la création");
+      const message = error.response?.data?.message || "Erreur lors de la création";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleTogglePermission = async (permissionId: number, currentStatus: boolean) => {
+  const handleTogglePermission = async (permissionId: number) => {
     try {
-      await api.put(`/permissions/${permissionId}`, {
-        active: !currentStatus
-      });
-      toast.success(`Autorisation ${!currentStatus ? 'activée' : 'désactivée'}`);
-      fetchPermissions();
+      const response = await api.post(`admin/permission/${permissionId}`);
+      toast.success(response.data.message || 'Statut modifié avec succès');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await fetchPermissions();
     } catch (error: any) {
-      console.error('Erreur toggle permission:', error);
-      toast.error('Erreur lors de la modification du statut');
+      console.error('Erreur toggle permission:', error.response?.data);
+      const message = error.response?.data?.message || 'Erreur lors de la modification du statut';
+      toast.error(message);
     }
   };
 
@@ -136,19 +165,21 @@ export function SettingsSection() {
     fetchEmployees();
   }, []);
 
+  // Grouper les permissions par employé
   const groupedPermissions = permissions.reduce((acc: any, permission) => {
-    if (!acc[permission.user_id]) {
-      acc[permission.user_id] = {
-        user: {
+    const userId = permission.user_id;
+    if (!acc[userId]) {
+      acc[userId] = {
+        user: permission.employe || {
           id: permission.user_id,
-          fullname: permission.fullname,
-          email: permission.email,
-          role: permission.role
+          fullname: permission.fullname || 'N/A',
+          email: permission.email || 'N/A',
+          role: permission.role || 'N/A'
         },
         permissions: []
       };
     }
-    acc[permission.user_id].permissions.push(permission);
+    acc[userId].permissions.push(permission);
     return acc;
   }, {});
 
@@ -212,18 +243,26 @@ export function SettingsSection() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="employee">Employé *</Label>
-                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un employé" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id.toString()}>
-                          {emp.fullname} ({emp.role})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {employees && employees.length > 0 ? (
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un employé" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id.toString()}>
+                            {emp.fullname} ({emp.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select disabled>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Aucun employé disponible" />
+                      </SelectTrigger>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -243,12 +282,13 @@ export function SettingsSection() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Description *</Label>
                   <Textarea
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Description de l'autorisation..."
+                    required
                   />
                 </div>
 
@@ -303,9 +343,14 @@ export function SettingsSection() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Shield className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Aucune autorisation</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {searchTerm ? 'Aucune autorisation trouvée' : 'Aucune autorisation'}
+                </h3>
                 <p className="text-sm text-muted-foreground text-center mb-4">
-                  Commencez par attribuer des autorisations à vos employés
+                  {searchTerm
+                    ? `Aucune autorisation ne correspond à "${searchTerm}"`
+                    : 'Commencez par attribuer des autorisations à vos employés'
+                  }
                 </p>
               </CardContent>
             </Card>
@@ -345,6 +390,11 @@ export function SettingsSection() {
                               <p className="text-xs text-muted-foreground">
                                 {perm.description}
                               </p>
+                              {perm.created_at && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Créé le: {new Date(perm.created_at).toLocaleDateString('fr-FR')}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -355,13 +405,17 @@ export function SettingsSection() {
                             )}
                             <Switch
                               checked={perm.active}
-                              onCheckedChange={() =>
-                                handleTogglePermission(perm.id, perm.active)
-                              }
+                              onCheckedChange={() => handleTogglePermission(perm.id)}
                             />
                           </div>
                         </div>
                       ))}
+                    </div>
+                    <div className="pt-2 border-t mt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Permissions totales: {group.permissions.length} |
+                        Actives: {group.permissions.filter((p: Permission) => p.active).length}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
