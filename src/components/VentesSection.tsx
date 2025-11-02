@@ -24,6 +24,7 @@ type ItemVente = {
 }
 
 type Ventes = {
+  reglement_statut: number;
   ventes_regles: number;
   ventes_en_attente: number;
   total_ventes: number;
@@ -686,7 +687,9 @@ export function VentesSection() {
                   Fermer
                 </Button>
                 <Button onClick={() => handleDownloadFacture(selectedVente.id)}>
-                  Télécharger la facture
+                  {selectedVente?.est_soldee
+                    ? 'Télécharger la facture'
+                    : 'Télécharger le reçu'}
                 </Button>
               </div>
             </div>
