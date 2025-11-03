@@ -21,8 +21,25 @@ import {
 } from "lucide-react";
 import { toast } from 'sonner';
 
+interface CommissionResume {
+  total_commission: number;
+  commission_payee: number;
+  commission_en_attente: number;
+  nombre_commissions_payees: number;
+  nombre_commissions_en_attente: number;
+  nombre_total_commissions: number;
+}
+
 export function CommissionSection() {
   const [commissions, setCommissions] = useState<any[]>([]);
+  const [resume, setResume] = useState<CommissionResume>({
+    total_commission: 0,
+    commission_payee: 0,
+    commission_en_attente: 0,
+    nombre_commissions_payees: 0,
+    nombre_commissions_en_attente: 0,
+    nombre_total_commissions: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,13 +51,47 @@ export function CommissionSection() {
   const [montantVerse, setMontantVerse] = useState("");
 
   // Récupérer les commissions
+  // Récupérer les commissions
   const fetchCommissions = async () => {
     try {
       const response = await api.get('commissions/');
-      setCommissions(response.data.data || []);
-      console.log("Commissions:", response.data.data);
+
+      console.log('📊 Réponse API complète:', response.data);
+
+      // ✅ Vérifier que les données existent
+      if (!response.data) {
+        console.error('❌ Pas de données dans la réponse');
+        toast.error('Aucune donnée reçue du serveur');
+        return;
+      }
+
+      if (!response.data.success) {
+        console.error('❌ Réponse non réussie:', response.data.message);
+        toast.error(response.data.message || 'Erreur lors du chargement');
+        return;
+      }
+
+      // ✅ Récupérer les données et le résumé
+      const commissionsData = response.data.data || [];
+      const resumeData = response.data.resume || {
+        total_commission: 0,
+        commission_payee: 0,
+        commission_en_attente: 0,
+        nombre_commissions_payees: 0,
+        nombre_commissions_en_attente: 0,
+        nombre_total_commissions: 0,
+      };
+
+      console.log('✅ Commissions récupérées:', commissionsData.length);
+      console.log('✅ Résumé:', resumeData);
+
+      setCommissions(commissionsData);
+      setResume(resumeData);
+
     } catch (error: any) {
-      console.error('Erreur récupération commissions:', error);
+      console.error('❌ Erreur récupération commissions:', error);
+      console.error('❌ Détails erreur:', error.response);
+
       if (error.response?.status === 403) {
         toast.error('Accès refusé. Vous n\'avez pas les permissions nécessaires');
       } else {
@@ -116,27 +167,33 @@ export function CommissionSection() {
   // Filtrer par statut selon l'onglet
   const getFilteredByTab = () => {
     if (activeTab === "paye") {
-      return filteredCommissions.filter(c => c.etat_commission === true);
+      return filteredCommissions.filter(c => c.etat_commission === 1 || c.etat_commission === true);
     }
     if (activeTab === "non_paye") {
-      return filteredCommissions.filter(c => c.etat_commission === false);
+      return filteredCommissions.filter(c => c.etat_commission === 0 || c.etat_commission === false);
     }
     return filteredCommissions;
   };
 
   const displayedCommissions = getFilteredByTab();
 
-  // Calculs statistiques
-  const totalCommissionDues = commissions.reduce((acc, c) => acc + (parseFloat(c.commission_due) || 0), 0);
-  const totalCommissionPayees = commissions.filter(c => c.etat_commission === true)
-    .reduce((acc, c) => acc + (parseFloat(c.commission_due) || 0), 0);
-  const totalCommissionEnAttente = commissions.filter(c => c.etat_commission === false).length;
+  // ✅ CORRECTION : Utiliser les données du résumé
+  const totalCommissionDues = resume.total_commission;
+  const totalCommissionPayees = resume.commission_payee;
+  const totalCommissionEnAttente = resume.commission_en_attente;
+  const nombreCommissionsPayees = resume.nombre_commissions_payees;
+  const nombreCommissionsEnAttente = resume.nombre_commissions_en_attente;
+
   const tauxMoyen = commissions.length > 0
     ? commissions.reduce((sum, c) => sum + (parseFloat(c.user?.taux_commission) || 0), 0) / commissions.length
     : 0;
 
-  const getStatutColor = (etat: boolean) => {
-    return etat ? "default" : "destructive";
+  const getStatutColor = (etat: boolean | number) => {
+    return (etat === true || etat === 1) ? "default" : "destructive";
+  };
+
+  const getStatutLabel = (etat: boolean | number) => {
+    return (etat === true || etat === 1) ? "Payée" : "Non payée";
   };
 
   if (loading) {
@@ -175,15 +232,15 @@ export function CommissionSection() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total à payer</CardTitle>
+            <CardTitle className="text-sm font-medium">Total des commissions</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(totalCommissionDues - totalCommissionPayees).toLocaleString('fr-FR')} Fcfa
+              {totalCommissionDues.toLocaleString('fr-FR')} Fcfa
             </div>
             <p className="text-xs text-muted-foreground">
-              Sur {totalCommissionDues.toLocaleString('fr-FR')} Fcfa dus
+              Toutes les commissions
             </p>
           </CardContent>
         </Card>
@@ -191,10 +248,10 @@ export function CommissionSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Commissions payées</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-green-600">
               {totalCommissionPayees.toLocaleString('fr-FR')} Fcfa
             </div>
             <p className="text-xs text-muted-foreground">
@@ -206,12 +263,14 @@ export function CommissionSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">En attente</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <AlertCircle className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCommissionEnAttente}</div>
+            <div className="text-2xl font-bold text-orange-600">
+              {totalCommissionEnAttente.toLocaleString('fr-FR')} Fcfa
+            </div>
             <p className="text-xs text-muted-foreground">
-              Paiements en attente
+              {nombreCommissionsEnAttente} paiement(s) en attente
             </p>
           </CardContent>
         </Card>
@@ -219,7 +278,7 @@ export function CommissionSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Taux moyen</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -235,14 +294,14 @@ export function CommissionSection() {
       {/* Onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="overview">
             Toutes ({commissions.length})
           </TabsTrigger>
-          <TabsTrigger value="paye" className="data-[state=active]:bg-success data-[state=active]:text-white">
-            Payées ({commissions.filter(c => c.etat_commission === true).length})
+          <TabsTrigger value="paye">
+            Payées ({nombreCommissionsPayees})
           </TabsTrigger>
-          <TabsTrigger value="non_paye" className="data-[state=active]:bg-warning data-[state=active]:text-white">
-            Non payées ({commissions.filter(c => c.etat_commission === false).length})
+          <TabsTrigger value="non_paye">
+            Non payées ({nombreCommissionsEnAttente})
           </TabsTrigger>
         </TabsList>
 
@@ -270,7 +329,7 @@ export function CommissionSection() {
                       <div className="md:col-span-2">
                         <h3 className="font-semibold">{commission.user?.fullname || 'N/A'}</h3>
                         <p className="text-sm text-muted-foreground">
-                          Vente: {commission.vente?.id || 'N/A'}
+                          Vente: {commission.vente?.reference || 'N/A'}
                         </p>
                       </div>
 
@@ -288,20 +347,20 @@ export function CommissionSection() {
 
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Commission</p>
-                        <p className="font-semibold text-success">
+                        <p className="font-semibold text-green-600">
                           {parseFloat(commission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
                         </p>
                       </div>
 
                       <div className="flex items-center justify-between gap-2">
                         <Badge variant={getStatutColor(commission.etat_commission)}>
-                          {commission.etat_commission ? 'Payée' : 'Non payée'}
+                          {getStatutLabel(commission.etat_commission)}
                         </Badge>
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleViewDetails(commission)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {!commission.etat_commission && (
+                          {(commission.etat_commission === 0 || commission.etat_commission === false) && (
                             <Button size="sm" onClick={() => handleOpenPayDialog(commission)}>
                               <CreditCard className="h-4 w-4 mr-1" />
                               Payer
@@ -318,7 +377,7 @@ export function CommissionSection() {
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Users className="h-16 w-16 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                    Aucune commission disponible
+                    Aucune commission {activeTab === "paye" ? "payée" : activeTab === "non_paye" ? "en attente" : "disponible"}
                   </h3>
                 </CardContent>
               </Card>
@@ -353,7 +412,7 @@ export function CommissionSection() {
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-sm font-medium">Commission due</span>
-                  <span className="font-bold text-success">
+                  <span className="font-bold text-green-600">
                     {parseFloat(selectedCommission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
                   </span>
                 </div>
@@ -437,8 +496,8 @@ export function CommissionSection() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">ID Vente</span>
-                    <span className="font-medium">{selectedCommission.ventes_id}</span>
+                    <span className="text-muted-foreground">Référence de la Vente</span>
+                    <span className="font-medium">{selectedCommission.vente?.reference}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Montant de la vente</span>
@@ -456,14 +515,14 @@ export function CommissionSection() {
                 <CardContent className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Commission due</span>
-                    <span className="font-bold text-success">
+                    <span className="font-bold text-green-600">
                       {parseFloat(selectedCommission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Statut</span>
                     <Badge variant={getStatutColor(selectedCommission.etat_commission)}>
-                      {selectedCommission.etat_commission ? 'Payée' : 'Non payée'}
+                      {getStatutLabel(selectedCommission.etat_commission)}
                     </Badge>
                   </div>
                 </CardContent>

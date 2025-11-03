@@ -91,6 +91,7 @@ export function StockSection() {
     try {
       const response = await api.get('/stock/');
       setSelectStock(response.data.data);
+      console.log(response.data.data?.pho)
 
     } catch (error) {
       console.error('Erreur survenue lors de la récupération', error);
@@ -127,12 +128,8 @@ export function StockSection() {
     e.preventDefault();
 
     console.log('Données du formulaire:', {
-      achat,
-      categorie,
-      quantite,
-      quantiMin,
-      prixVente,
-      description
+      achat, categorie, quantite,
+      quantiMin, prixVente, description
     });
 
     if (!achat || !categorie || !quantite || !quantiMin || !prixVente) {
@@ -300,6 +297,29 @@ export function StockSection() {
     return { entrees, sorties };
   };
 
+  const getImages = (item: any) => {
+    console.log('Item reçu:', item);
+    console.log('Photos:', item?.achat?.photos || item?.photos);
+
+    const photos = item?.achat?.photos || item?.photos;
+
+    if (photos && Array.isArray(photos) && photos.length > 0) {
+      const imagePath = photos[0].path;
+      console.log('Image path brut:', imagePath);
+
+      // Si le path ne commence pas par http, ajouter l'URL de base
+      if (imagePath && !imagePath.startsWith('http')) {
+        const baseURL = 'http://127.0.0.1:8000/'; // Votre URL backend
+        const fullUrl = baseURL + imagePath;
+        console.log('URL complète:', fullUrl);
+        return fullUrl;
+      }
+      return imagePath;
+    }
+
+    console.log('Aucune image trouvée');
+    return null;
+  };
   // Calculer les stats globales
   const totalEntrees = mouvements
     .filter((m: any) => m.type_mouvement === 'achat' || m.type_mouvement === 'renouvellement')
@@ -440,7 +460,7 @@ export function StockSection() {
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{totalEntrees}</div>
+            <div className="text-2xl font-bold text-green-600">{stock?.total_entrees_stock}</div>
           </CardContent>
         </Card>
         <Card>
@@ -449,7 +469,7 @@ export function StockSection() {
             <PackageMinus className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{totalSorties}</div>
+            <div className="text-2xl font-bold text-red-600">{stock?.total_sorties_stock}</div>
           </CardContent>
         </Card>
         <Card>
@@ -526,13 +546,25 @@ export function StockSection() {
                         <Badge variant="outline">{s.categorie || "Non définie"}</Badge>
                       </TableCell>
                       <TableCell>
-                        {s.photo ? (
-                          <img src={photo} className="w-5 h-5 object-cover rounded" />
-                        ) : (
-                          <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
-                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        )}
+                        <div className="relative">
+                          {(() => {
+                            const imageUrl = getImages(s);
+                            console.log('URL image pour', s.code_produit, ':', imageUrl);
+
+                            return imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={s.achat?.nom_service || s.nom_service || 'Produit'}
+                                className="w-12 h-12 object-cover rounded border"
+                                onLoad={() => console.log('Image chargée avec succès:', imageUrl)}
+                              />
+                            ) : (
+                              <div className="h-12 w-12 bg-muted rounded flex items-center justify-center">
+                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -629,13 +661,20 @@ export function StockSection() {
             <div className="grid gap-6">
               <div className="flex gap-6">
                 <div className="flex-shrink-0">
-                  {detail.photo ? (
-                    <img src={detail.photo} alt="Produit" className="h-48 w-48 object-cover rounded-lg" />
-                  ) : (
-                    <div className="h-48 w-48 bg-muted rounded-lg flex items-center justify-center">
-                      <ImageIcon className="h-16 w-16 text-muted-foreground" />
-                    </div>
-                  )}
+                  {getImages(detail) ? (
+                    <img
+                      src={getImages(detail)}
+                      alt={detail.achat?.nom_service || 'Produit'}
+                      className="h-48 w-48 object-cover rounded-lg border shadow-sm"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`h-48 w-48 bg-muted rounded-lg flex items-center justify-center ${getImages(detail) ? 'hidden' : ''}`}>
+                    <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                  </div>
                 </div>
                 <div className="flex-1 grid gap-3">
                   <div>

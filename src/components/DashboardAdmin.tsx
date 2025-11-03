@@ -9,15 +9,20 @@ import {
   TrendingUp,
   Package,
   DollarSign,
-  UserCheck,
   Building,
   RefreshCw,
   ClipboardList,
   Wallet,
   PackagePlus,
-  PackageMinus
+  PackageMinus,
+  BarChart3,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react";
 import { toast } from 'sonner';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 type Stats = {
@@ -37,11 +42,44 @@ type Stats = {
   total_sorties_stock: string;
 };
 
+type AllStats = {
+  benefices_total: number;
+  benefice_mois: number;
+  chiffres_affaire_mois: number;
+  total_ventes: number;
+  ventes_en_attente: number;
+  ventes_regles: number;
+  total_achats: number;
+  total_prix_achats: number;
+};
+
+type MonthlyData = {
+  mois: string;
+  mois_complet: string;
+  ventes: number;
+  achats: number;
+  commissions: number;
+  benefices: number;
+};
+
+const COLORS = {
+  primary: '#3b82f6',
+  success: '#22c55e',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  purple: '#a855f7',
+  cyan: '#06b6d4',
+  pink: '#ec4899',
+  indigo: '#6366f1'
+};
+
 export const DashboardAdmin = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [stats, setStats] = useState<Stats | null>(null);
+  const [allStats, setAllStats] = useState<AllStats | null>(null);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true)
-
+  const [showGraphs, setShowGraphs] = useState(false);
 
   const fecthDashboard = async () => {
     try {
@@ -50,12 +88,21 @@ export const DashboardAdmin = () => {
         console.error('Pas de token trouvé');
         return;
       }
-      console.log(token)
+      
       const response = await api.get('/dashboard');
+      const responsesStats = await api.get('/allStats');
+      const monthlyResponse = await api.get('/monthlyStats');
+      
       setStats(response.data.data);
-      console.log(response.data.data)
+      setAllStats(responsesStats.data.data);
+      setMonthlyData(monthlyResponse.data.data || []);
+      
+      console.log('Dashboard:', response.data.data);
+      console.log('All Stats:', responsesStats.data.data);
+      console.log('Monthly Data:', monthlyResponse.data.data);
     } catch (error) {
       console.error('Erreur de récupération du dashboard', error);
+      toast.error('Erreur lors du chargement des données');
 
       if (error.response?.status === 401) {
         console.error('token invalide ou expiré');
@@ -81,6 +128,74 @@ export const DashboardAdmin = () => {
     }
   }
 
+  // Préparer les données pour les graphiques
+  const getStockData = () => {
+    if (!stats) return [];
+    return [
+      { name: 'Entrées Stock', value: parseInt(stats.total_entrees_stock) || 0, color: COLORS.success },
+      { name: 'Sorties Stock', value: parseInt(stats.total_sorties_stock) || 0, color: COLORS.danger }
+    ];
+  };
+
+  const getClientsData = () => {
+    if (!stats) return [];
+    const ancienClients = stats.total_client - stats.nouveau_cient;
+    return [
+      { name: 'Nouveaux clients', value: stats.nouveau_cient || 0, color: COLORS.primary },
+      { name: 'Clients existants', value: ancienClients > 0 ? ancienClients : 0, color: COLORS.cyan }
+    ];
+  };
+
+  const getPersonnelData = () => {
+    if (!stats) return [];
+    return [
+      { name: 'Employés actifs', value: stats.total_employe || 0, color: COLORS.success },
+      { name: 'Employés inactifs', value: stats.total_employe_inactifs || 0, color: COLORS.warning },
+      { name: 'Fournisseurs', value: stats.total_fournisseurs || 0, color: COLORS.purple }
+    ];
+  };
+
+  const getCommissionsData = () => {
+    if (!stats) return [];
+    return [
+      { name: 'Commissions reversées', value: stats.total_commissions_reversees || 0, color: COLORS.success },
+      { name: 'Commissions dues', value: stats.total_commissions_dues || 0, color: COLORS.warning }
+    ];
+  };
+
+  const getStockStatusData = () => {
+    if (!stats) return [];
+    const stockNormal = stats.total_produits_stock - stats.total_stock_faible;
+    return [
+      { name: 'Stock normal', value: stockNormal > 0 ? stockNormal : 0, color: COLORS.success },
+      { name: 'Stock faible', value: stats.total_stock_faible || 0, color: COLORS.danger }
+    ];
+  };
+
+  const getVentesData = () => {
+    if (!allStats) return [];
+    return [
+      { name: 'Payées', value: allStats.total_ventes || 0, color: COLORS.success },
+      { name: 'En attente', value: allStats.ventes_en_attente || 0, color: COLORS.warning },
+      { name: 'Réglées', value: allStats.ventes_regles || 0, color: COLORS.primary }
+    ];
+  };
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div className="bg-background border border-border rounded-lg shadow-lg p-3">
+          <p className="text-sm font-medium text-foreground">{data.name}</p>
+          <p className="text-sm text-muted-foreground">
+            Valeur: <span className="font-bold text-foreground">{data.value.toLocaleString()}</span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
 
   if (loading) {
     return (
@@ -95,7 +210,7 @@ export const DashboardAdmin = () => {
     );
   }
 
-  if (!stats) {
+  if (!stats || !allStats) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <Card className="w-full max-w-lg">
@@ -123,6 +238,10 @@ export const DashboardAdmin = () => {
       </div>
     )
   }
+
+  const benefice = allStats?.benefices_total || 0;
+  const isBeneficePositif = benefice >= 0;
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -130,32 +249,89 @@ export const DashboardAdmin = () => {
           <h1 className="text-3xl font-bold text-foreground">Tableau de bord Administrateur</h1>
           <p className="text-muted-foreground">Vue d'ensemble complète de votre activité commerciale</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Actualiser
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            variant={showGraphs ? "default" : "outline"}
+            onClick={() => setShowGraphs(!showGraphs)}
+          >
+            <BarChart3 className="mr-2 h-4 w-4" />
+            {showGraphs ? "Masquer graphiques" : "Voir graphiques"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
+      {/* Card Bénéfices - Pleine largeur */}
+      <Card className={`border-2 ${isBeneficePositif ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-red-500 bg-red-50 dark:bg-red-950'}`}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="flex items-center gap-3">
+            <div className={`p-3 rounded-full ${isBeneficePositif ? 'bg-green-500' : 'bg-red-500'}`}>
+              {isBeneficePositif ? (
+                <TrendingUp className="h-6 w-6 text-white" />
+              ) : (
+                <TrendingDown className="h-6 w-6 text-white" />
+              )}
+            </div>
+            <div>
+              <CardTitle className="text-lg font-medium">Bénéfices Total</CardTitle>
+              <CardDescription>Revenus - Achats - Commissions</CardDescription>
+            </div>
+          </div>
+          <Badge variant={isBeneficePositif ? "default" : "destructive"} className="text-sm px-3 py-1">
+            {isBeneficePositif ? (
+              <ArrowUpRight className="h-4 w-4 mr-1 inline" />
+            ) : (
+              <ArrowDownRight className="h-4 w-4 mr-1 inline" />
+            )}
+            {isBeneficePositif ? "Positif" : "Négatif"}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div className={`text-4xl font-bold ${isBeneficePositif ? 'text-green-600' : 'text-red-600'}`}>
+            {isBeneficePositif ? '+' : ''}{benefice.toLocaleString()} Fcfa
+          </div>
+          <div className="flex gap-6 mt-4 text-sm">
+            <div>
+              <p className="text-muted-foreground">Revenus totaux</p>
+              <p className="font-semibold text-green-600">+{stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Achats totaux</p>
+              <p className="font-semibold text-red-600">-{(allStats?.total_prix_achats || 0).toLocaleString()} Fcfa</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Commissions payées</p>
+              <p className="font-semibold text-orange-600">-{stats?.total_commissions_reversees?.toLocaleString() || 0} Fcfa</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Stats principales */}
+      {/* Stats principales - 4 colonnes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Revenus totaux
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
+            <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">{stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa</div>
+            <div className="text-2xl font-bold text-green-600">{stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Chiffre d'affaires total
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Nombre de clients
@@ -164,10 +340,13 @@ export const DashboardAdmin = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-card-foreground">{stats?.total_client || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              <span className="text-green-600 font-semibold">+{stats?.nouveau_cient || 0}</span> ce mois
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Ventes ce mois
@@ -176,10 +355,13 @@ export const DashboardAdmin = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-card-foreground">{stats?.total_ventes || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Transactions réalisées
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Commissions dues
@@ -188,16 +370,16 @@ export const DashboardAdmin = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{stats?.total_commissions_dues?.toLocaleString() || 0} Fcfa</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               À reverser
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Stats stock et commissions */}
+      {/* Stats stock et commissions - 4 colonnes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Entrées Stock
@@ -205,14 +387,14 @@ export const DashboardAdmin = () => {
             <PackagePlus className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats?.total_entrees_stock || 0}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-green-600">+{stats?.total_entrees_stock || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               Articles ajoutés
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Sorties Stock
@@ -220,14 +402,14 @@ export const DashboardAdmin = () => {
             <PackageMinus className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats?.total_sorties_stock || 0}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-red-600">-{stats?.total_sorties_stock || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               Articles vendus
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Commissions reversées
@@ -236,13 +418,13 @@ export const DashboardAdmin = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats?.total_commissions_reversees?.toLocaleString() || 0} Fcfa</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Déjà payées
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-card-foreground">
               Stock faible
@@ -251,12 +433,163 @@ export const DashboardAdmin = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{stats?.total_stock_faible || 0}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Nécessite réapprovisionnement
             </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Section Graphiques */}
+      {showGraphs && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-foreground">Analyse graphique</h2>
+          
+          {/* Graphique unique avec tabs */}
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-card-foreground">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Analyses des données
+              </CardTitle>
+              <CardDescription>
+                Sélectionnez une catégorie pour visualiser les statistiques
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="evolution" className="w-full">
+                <TabsList className="grid w-full grid-cols-5 mb-6">
+                  <TabsTrigger value="evolution">Évolution</TabsTrigger>
+                  <TabsTrigger value="stock">Stock</TabsTrigger>
+                  <TabsTrigger value="ventes">Ventes</TabsTrigger>
+                  <TabsTrigger value="clients">Clients</TabsTrigger>
+                  <TabsTrigger value="personnel">Personnel</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="evolution">
+                  <div className="flex flex-col items-center">
+                    <h3 className="text-lg font-semibold mb-2">Évolution mensuelle</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Ventes, Achats et Bénéfices</p>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <LineChart data={monthlyData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="mois" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => `${Number(value).toLocaleString()} Fcfa`} />
+                        <Legend />
+                        <Line type="monotone" dataKey="ventes" stroke={COLORS.success} strokeWidth={2} name="Ventes" />
+                        <Line type="monotone" dataKey="achats" stroke={COLORS.danger} strokeWidth={2} name="Achats" />
+                        <Line type="monotone" dataKey="benefices" stroke={COLORS.primary} strokeWidth={2} name="Bénéfices" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="stock">
+                  <div className="flex flex-col items-center">
+                    <h3 className="text-lg font-semibold mb-2">Mouvements de Stock</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Entrées vs Sorties</p>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart data={getStockData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar dataKey="value" fill="#3b82f6">
+                          {getStockData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="ventes">
+                  <div className="flex flex-col items-center">
+                    <h3 className="text-lg font-semibold mb-2">Répartition des Ventes</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Par statut</p>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <PieChart>
+                        <Pie
+                          data={getVentesData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {getVentesData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="clients">
+                  <div className="flex flex-col items-center">
+                    <h3 className="text-lg font-semibold mb-2">Répartition des Clients</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Nouveaux vs Existants</p>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <PieChart>
+                        <Pie
+                          data={getClientsData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {getClientsData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="personnel">
+                  <div className="flex flex-col items-center">
+                    <h3 className="text-lg font-semibold mb-2">Personnel & Fournisseurs</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Répartition des acteurs</p>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <PieChart>
+                        <Pie
+                          data={getPersonnelData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent, value }) => `${value} (${(percent * 100).toFixed(0)}%)`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {getPersonnelData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Sections de gestion */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -275,10 +608,6 @@ export const DashboardAdmin = () => {
               <span className="text-sm text-card-foreground">Employés actifs</span>
               <Badge variant="secondary">{stats?.total_employe}</Badge>
             </div>
-            {/* <div className="flex justify-between items-center">
-              <span className="text-sm text-card-foreground">En congé</span>
-              <Badge variant="outline">3</Badge>
-            </div> */}
           </CardContent>
         </Card>
 
@@ -321,7 +650,6 @@ export const DashboardAdmin = () => {
             </div>
           </CardContent>
         </Card>
-
       </div>
     </div>
   );
