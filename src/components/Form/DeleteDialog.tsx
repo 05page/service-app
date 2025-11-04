@@ -9,10 +9,11 @@ interface DeleteConfirmDialogProps {
     description?: string;
     itemName?: string;
     isDeleting: boolean;
+    confirmText?: string;
 }
 
 export default function DeleteDialog({open, openChange, onConfirm, title = "Confirmer la supression", 
-    description, itemName, isDeleting = false}: DeleteConfirmDialogProps){
+    description, itemName, isDeleting = false, confirmText}: DeleteConfirmDialogProps){
     const defaulDescription = itemName 
     ? `Êtes vous sur de vouloir supprimer ${itemName}? Cette suppression entrainera la supresion de d'autres informations à la quelle elles sont liées. Cette action est irréversible.`
     : "Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.";
@@ -32,7 +33,7 @@ export default function DeleteDialog({open, openChange, onConfirm, title = "Conf
                     <AlertDialogAction onClick={onConfirm}
                     disabled={isDeleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        {isDeleting ? "supression..." : "supprimer"}
+                        {isDeleting ? (confirmText ? `${confirmText}...` : "supression...") : (confirmText || "supprimer")}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

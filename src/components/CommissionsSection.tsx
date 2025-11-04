@@ -323,50 +323,55 @@ export function CommissionSection() {
           <div className="space-y-4">
             {displayedCommissions.length > 0 ? (
               displayedCommissions.map((commission) => (
-                <Card key={commission.id}>
+                <Card key={commission.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
-                      <div className="md:col-span-2">
-                        <h3 className="font-semibold">{commission.user?.fullname || 'N/A'}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Vente: {commission.vente?.reference || 'N/A'}
-                        </p>
-                      </div>
-
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Prix vente</p>
-                        <p className="font-semibold">
-                          {parseFloat(commission.vente?.prix_total || 0).toLocaleString('fr-FR')} Fcfa
-                        </p>
-                      </div>
-
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Taux</p>
-                        <p className="font-semibold">{commission.user?.taux_commission || 0}%</p>
-                      </div>
-
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Commission</p>
-                        <p className="font-semibold text-green-600">
-                          {parseFloat(commission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge variant={getStatutColor(commission.etat_commission)}>
+                    <div className="flex flex-col space-y-4">
+                      {/* En-tête avec nom et référence */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg">{commission.user?.fullname || 'N/A'}</h3>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Vente: {commission.vente?.reference || 'N/A'}
+                          </p>
+                        </div>
+                        <Badge variant={getStatutColor(commission.etat_commission)} className="self-start sm:self-center">
                           {getStatutLabel(commission.etat_commission)}
                         </Badge>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(commission)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {(commission.etat_commission === 0 || commission.etat_commission === false) && (
-                            <Button size="sm" onClick={() => handleOpenPayDialog(commission)}>
-                              <CreditCard className="h-4 w-4 mr-1" />
-                              Payer
-                            </Button>
-                          )}
+                      </div>
+
+                      {/* Détails financiers */}
+                      <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Prix vente</p>
+                          <p className="font-semibold text-sm">
+                            {parseFloat(commission.vente?.prix_total || 0).toLocaleString('fr-FR')} Fcfa
+                          </p>
                         </div>
+                        <div className="text-center border-x border-border">
+                          <p className="text-xs text-muted-foreground mb-1">Taux</p>
+                          <p className="font-semibold text-sm">{commission.user?.taux_commission || 0}%</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Commission</p>
+                          <p className="font-semibold text-sm text-green-600">
+                            {parseFloat(commission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 justify-end pt-2 border-t">
+                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(commission)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Détails
+                        </Button>
+                        {(commission.etat_commission === 0 || commission.etat_commission === false) && (
+                          <Button size="sm" onClick={() => handleOpenPayDialog(commission)}>
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Payer
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>

@@ -1,5 +1,6 @@
 import api from '../api/api';
 import DeleteDialog from './Form/DeleteDialog';
+import { AchatHistoryDialog } from './Form/AchatHistoryDialog';
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Plus, Search, Edit, Trash2, Package, Calendar, TrendingUp, DollarSign,
   RefreshCw, FileText, ShieldAlert, Image as ImageIcon, Eye, X,
-  ChevronLeft, ChevronRight, Upload
+  ChevronLeft, ChevronRight, Upload, History, EyeOff, Ban
 } from "lucide-react";
 import { toast } from 'sonner';
 import { usePagination } from "../hooks/usePagination";
@@ -68,6 +69,17 @@ export function AchatsSection() {
 
   // Pour la galerie dans les détails
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+  // États pour l'historique
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedAchatHistory, setSelectedAchatHistory] = useState<any>(null);
+  const [achatHistorique, setAchatHistorique] = useState<any>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // États pour annuler et masquer
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [achatCancelled, setAchatCancelled] = useState<any | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const fecthAchats = async () => {
     try {
@@ -330,21 +342,56 @@ export function AchatsSection() {
     setDeleteDialogOpen(true)
   }
 
-  const handleDelete = async () => {
+  const handleHideAchat = async () => {
     if (achatDelete) {
       setIsDeleting(true);
       try {
-        await api.delete(`/achat/${achatDelete.id}`);
+        await api.put(`/achat/${achatDelete.id}/masquer`);
         await Promise.all([fecthAchats(), getAchats()]);
-        toast.success(`Achat ${achatDelete?.numero_achat} supprimé avec succès`);
+        toast.success(`Achat ${achatDelete?.numero_achat} masqué avec succès`);
         setDeleteDialogOpen(false);
         setAchatDelete(null);
       } catch (error: any) {
-        toast.error("Erreur lors de la suppression");
+        toast.error("Erreur lors du masquage");
         console.error(error.response?.data || error);
       } finally {
         setIsDeleting(false);
       }
+    }
+  }
+
+  const handleCancelAchat = async () => {
+    if (achatCancelled) {
+      setIsCancelling(true);
+      try {
+        await api.put(`/achat/${achatCancelled.id}/annuler`);
+        await Promise.all([fecthAchats(), getAchats()]);
+        toast.success(`Achat ${achatCancelled?.numero_achat} annulé avec succès`);
+        setCancelDialogOpen(false);
+        setAchatCancelled(null);
+      } catch (error: any) {
+        toast.error("Erreur lors de l'annulation");
+        console.error(error.response?.data || error);
+      } finally {
+        setIsCancelling(false);
+      }
+    }
+  }
+
+  const handleShowHistory = async (achat: any) => {
+    setSelectedAchatHistory(achat);
+    setLoadingHistory(true);
+    setHistoryDialogOpen(true);
+    
+    try {
+      const response = await api.get(`/achat/${achat.id}/historique`);
+      setAchatHistorique(response.data.data);
+    } catch (error: any) {
+      console.error('Erreur lors du chargement de l\'historique:', error);
+      toast.error('Erreur lors du chargement de l\'historique');
+      setAchatHistorique(null);
+    } finally {
+      setLoadingHistory(false);
     }
   }
 
@@ -897,6 +944,9 @@ export function AchatsSection() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button onClick={() => handleShowHistory(a)} variant="outline" size="sm" title='Historique'>
+                          <History className='h-4 w-4' />
+                        </Button>
                         <Button onClick={() => openDetailDialog(a)} variant="outline" size="sm" title='Détails'>
                           <Eye className='h-4 w-4' />
                         </Button>
@@ -906,8 +956,16 @@ export function AchatsSection() {
                         <Button onClick={() => handleEdit(a)} variant="outline" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {a.statut !== "annule" && (
+                          <Button onClick={() => {
+                            setAchatCancelled(a);
+                            setCancelDialogOpen(true);
+                          }} variant="outline" size="sm">
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button onClick={() => handleClick(a)} variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
+                          <EyeOff className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -947,10 +1005,28 @@ export function AchatsSection() {
       <DeleteDialog
         open={deleteDialogOpen}
         openChange={setDeleteDialogOpen}
-        onConfirm={handleDelete}
-        itemName={`la commande ${achatDelete?.numero_achat}`}
-        description="Cela supprimera toutes les actions liés à cet achat. Cette action est irréversible."
+        onConfirm={handleHideAchat}
+        itemName={`l'achat ${achatDelete?.numero_achat}`}
+        description="Cet achat sera masqué mais pourra être réaffiché plus tard."
         isDeleting={isDeleting}
+        confirmText="Masquer"
+      />
+
+      <DeleteDialog
+        open={cancelDialogOpen}
+        openChange={setCancelDialogOpen}
+        onConfirm={handleCancelAchat}
+        itemName={`l'achat ${achatCancelled?.numero_achat}`}
+        description="Cet achat sera annulé. Cette action est irréversible."
+        isDeleting={isCancelling}
+        confirmText="Annuler l'achat"
+      />
+
+      <AchatHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        achat={selectedAchatHistory}
+        historique={achatHistorique}
       />
 
       {/* Dialog Détails avec Galerie */}
