@@ -8,6 +8,7 @@ import { RefreshCw } from "lucide-react";
 type Props = {
   isEdit?: boolean;
   achatId: any[];
+  usedAchatIds?: number[]; // IDs des achats déjà utilisés dans le stock
   achat: string;
   setAchat: (value: string) => void;
   categorie: string;
@@ -31,6 +32,7 @@ type Props = {
 export default function FormDialog({
   isEdit = false,
   achatId,
+  usedAchatIds = [],
   achat,
   setAchat,
   categorie,
@@ -50,7 +52,9 @@ export default function FormDialog({
   setDialogOpen,
   resetForm,
 }: Props) {
-  const achatSelectionne = achatId.find(a => a.id === parseInt(achat));
+  // Filtrer les achats déjà utilisés dans le stock
+  const availableAchats = achatId.filter(a => !usedAchatIds.includes(a.id));
+  const achatSelectionne = availableAchats.find(a => a.id === parseInt(achat));
 
   return (
     <form onSubmit={isEdit ? handleUpdate : handleSubmit}>
@@ -58,13 +62,13 @@ export default function FormDialog({
         {/* Achat */}
         <div className="space-y-2">
           <Label htmlFor="achat">Achat *</Label>
-          {achatId.length > 0 ? (
+          {availableAchats.length > 0 ? (
             <Select value={achat} onValueChange={setAchat} required>
               <SelectTrigger>
                 <SelectValue placeholder="Sélectionner l'achat à ajouter au stock" />
               </SelectTrigger>
               <SelectContent>
-                {achatId.map((a: any) => (
+                {availableAchats.map((a: any) => (
                   <SelectItem key={a.id} value={a.id.toString()}>
                     {a.numero_achat} - {a.nom_service}
                   </SelectItem>
@@ -77,6 +81,11 @@ export default function FormDialog({
                 <SelectValue placeholder="Aucun achat disponible" />
               </SelectTrigger>
             </Select>
+          )}
+          {availableAchats.length === 0 && achatId.length > 0 && (
+            <p className="text-sm text-amber-600">
+              Tous les achats sont déjà utilisés dans le stock. Créez un nouvel achat.
+            </p>
           )}
           {achatId.length === 0 && (
             <p className="text-sm text-red-500">Aucun achat trouvé. Veuillez effectuer un achat</p>

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import api from '../api/api'
 import FormDialog from "./Form/FormDialog";
+import RenewStockDialog from "./Form/RenewStockDialog";
+import StockHistoryDialog from "./Form/StockHistoryDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert,
-  Image as ImageIcon, Eye, TrendingUp, PackagePlus, PackageMinus
+  Image as ImageIcon, Eye, TrendingUp, PackagePlus, PackageMinus, RotateCcw, History
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -32,6 +34,15 @@ export function StockSection() {
   const [loading, setLoading] = useState(true);
   const [achatId, setAchatId] = useState<any[]>([]);
   const [mouvements, setMouvements] = useState<any[]>([]);
+  
+  // États pour le renouvellement
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
+  const [stockToRenew, setStockToRenew] = useState<any>(null);
+  const [isRenewing, setIsRenewing] = useState(false);
+  
+  // États pour l'historique
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [stockHistorique, setStockHistorique] = useState<any>(null);
 
   //Formulaire
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -234,6 +245,50 @@ export function StockSection() {
     }
   };
 
+  // Fonction pour renouveler un stock
+  const handleRenewStock = async (stockId: number, achatId: number, commentaire: string) => {
+    setIsRenewing(true);
+    try {
+      const response = await api.post('/stock/renouveler', {
+        stock_id: stockId,
+        achat_id: achatId,
+        commentaire
+      });
+      
+      toast.success(response.data.message || "Stock renouvelé avec succès");
+      await Promise.all([fetchStock(), getStock()]);
+      setRenewDialogOpen(false);
+      setStockToRenew(null);
+    } catch (error: any) {
+      console.error('Erreur renouvellement:', error.response?.data);
+      const message = error.response?.data?.message || "Erreur lors du renouvellement du stock";
+      toast.error(message);
+    } finally {
+      setIsRenewing(false);
+    }
+  };
+
+  // Fonction pour afficher l'historique d'un stock
+  const handleShowHistory = async (stock: any) => {
+    try {
+      const response = await api.get(`/stock/${stock.id}/historique`);
+      setStockHistorique(response.data.data);
+      setHistoryDialogOpen(true);
+    } catch (error: any) {
+      console.error('Erreur historique:', error.response?.data);
+      toast.error("Erreur lors du chargement de l'historique");
+    }
+  };
+
+  // Fonction pour ouvrir le dialogue de renouvellement
+  const handleRenewClick = (stock: any) => {
+    setStockToRenew(stock);
+    setRenewDialogOpen(true);
+  };
+
+  // Calculer les IDs des achats déjà utilisés dans le stock
+  const usedAchatIds = selectStock.map((s: any) => s.achat_id).filter(Boolean);
+
   useEffect(() => {
     fetchStock();
     getStock();
@@ -378,6 +433,7 @@ export function StockSection() {
               <DialogHeader><DialogTitle>Ajouter un nouvel article</DialogTitle></DialogHeader>
               <FormDialog
                 achatId={achatId}
+                usedAchatIds={usedAchatIds}
                 achat={achat}
                 setAchat={setAchat}
                 categorie={categorie}
@@ -404,6 +460,7 @@ export function StockSection() {
               <FormDialog
                 isEdit
                 achatId={achatId}
+                usedAchatIds={usedAchatIds}
                 achat={achat}
                 setAchat={setAchat}
                 categorie={categorie}
@@ -423,6 +480,23 @@ export function StockSection() {
               />
             </DialogContent>
           </Dialog>
+          
+          {/* Dialog de renouvellement */}
+          <RenewStockDialog
+            open={renewDialogOpen}
+            onOpenChange={setRenewDialogOpen}
+            stock={stockToRenew}
+            availableAchats={achatId}
+            onRenew={handleRenewStock}
+            isSubmitting={isRenewing}
+          />
+          
+          {/* Dialog d'historique */}
+          <StockHistoryDialog
+            open={historyDialogOpen}
+            onOpenChange={setHistoryDialogOpen}
+            historique={stockHistorique}
+          />
         </div>
       </div>
 
@@ -590,14 +664,38 @@ export function StockSection() {
                         <Badge variant={getStatutColor(s.statut)}>{getStatutLabel(s.statut)}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
-                          <Button onClick={() => { setDetail(s); setDetailDialogOpen(true) }} variant="outline" size="sm" title='Détails'>
+                        <div className="flex space-x-1">
+                          <Button 
+                            onClick={() => handleShowHistory(s)} 
+                            variant="outline" 
+                            size="sm" 
+                            title='Historique complet'
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                          {(s.statut === 'rupture' || s.statut === 'alerte') && (
+                            <Button 
+                              onClick={() => handleRenewClick(s)} 
+                              variant="outline" 
+                              size="sm"
+                              className="text-green-600 hover:text-green-700"
+                              title='Renouveler le stock'
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button 
+                            onClick={() => { setDetail(s); setDetailDialogOpen(true) }} 
+                            variant="outline" 
+                            size="sm" 
+                            title='Détails'
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button onClick={() => handleEdit(s)} variant="outline" size="sm">
+                          <Button onClick={() => handleEdit(s)} variant="outline" size="sm" title='Modifier'>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button onClick={() => handleDeleteClick(s)} variant="outline" size="sm">
+                          <Button onClick={() => handleDeleteClick(s)} variant="outline" size="sm" title='Supprimer'>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -655,7 +753,17 @@ export function StockSection() {
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Détails du produit {detail?.code_produit}</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Détails du produit {detail?.code_produit}</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => handleShowHistory(detail)}
+              >
+                <History className="h-4 w-4 mr-2" />
+                Voir l'historique complet
+              </Button>
+            </DialogTitle>
           </DialogHeader>
           {detail && (
             <div className="grid gap-6">
@@ -691,8 +799,8 @@ export function StockSection() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-sm text-muted-foreground">Quantité</p>
-                      <p className="font-medium">{detail.quantite} unités</p>
+                      <p className="text-sm text-muted-foreground">Quantité actuelle</p>
+                      <p className="font-bold text-xl">{detail.quantite} unités</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Quantité min</p>
@@ -702,6 +810,14 @@ export function StockSection() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Entrées totales</p>
+                  <p className="font-bold text-lg text-green-600">+{detail.entre_stock}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Sorties totales</p>
+                  <p className="font-bold text-lg text-red-600">-{detail.sortie_stock}</p>
+                </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Prix d'achat unitaire</p>
                   <p className="font-medium">{detail.achat?.prix_unitaire?.toLocaleString() || 0} Fcfa</p>
@@ -727,6 +843,20 @@ export function StockSection() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Description</p>
                   <p className="text-sm">{detail.description}</p>
+                </div>
+              )}
+              {(detail.statut === 'rupture' || detail.statut === 'alerte') && (
+                <div className="pt-4 border-t">
+                  <Button 
+                    onClick={() => {
+                      setDetailDialogOpen(false);
+                      handleRenewClick(detail);
+                    }}
+                    className="w-full"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Renouveler ce stock
+                  </Button>
                 </div>
               )}
             </div>
