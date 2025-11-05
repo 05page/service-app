@@ -355,7 +355,7 @@ export function SettingsSection() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {paginatedPermissions.map((group: any) => (
                 <Card key={group.user.id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">

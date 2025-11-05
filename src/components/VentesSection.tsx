@@ -11,11 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   Plus, Search, User, Package, Euro, TrendingUp, ShoppingCart, RefreshCw,
-  ShieldAlert, ChevronLeft, ChevronRight, Eye, Edit, Trash2,
-  CreditCard, History, EyeOff, Ban
+  ShieldAlert, ChevronLeft, ChevronRight, Eye, Edit,
+  CreditCard, History
 } from "lucide-react";
-import { toast } from 'sonner';
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "../components/Pagination";
 
 type ItemVente = {
   stock_id: string;
@@ -49,9 +51,6 @@ export function VentesSection() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [venteDelete, setVendelete] = useState<any | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -84,10 +83,6 @@ export function VentesSection() {
   const [venteHistorique, setVenteHistorique] = useState<any>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // États pour annuler et masquer
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [venteCancelled, setVenteCancelled] = useState<any | null>(null);
-  const [isCancelling, setIsCancelling] = useState(false);
 
   const fetchVentesStats = async () => {
     try {
@@ -352,10 +347,6 @@ export function VentesSection() {
     setPayementDialog(true);
   };
 
-  const handleClick = (v: any) => {
-    setVendelete(v)
-    setDeleteDialogOpen(true)
-  }
 
   //Traiter le paiement
   const handleProcessPayment = async (e: React.FormEvent) => {
@@ -392,41 +383,6 @@ export function VentesSection() {
     }
   }
 
-  const handleHide = async () => {
-    if (venteDelete) {
-      setIsDeleting(true);
-      try {
-        await api.put(`ventes/${venteDelete.id}/masquer`);
-        await Promise.all([fetchVentesStats(), selectVente()]);
-        toast.success(`Vente ${venteDelete?.reference} masquée avec succès`)
-        setDeleteDialogOpen(false);
-        setVendelete(null);
-      } catch (error: any) {
-        toast.error("Erreur lors du masquage");
-        console.error(error.response?.data || error);
-      } finally {
-        setIsDeleting(false)
-      }
-    }
-  }
-
-  const handleCancel = async () => {
-    if (venteCancelled) {
-      setIsCancelling(true);
-      try {
-        await api.put(`ventes/${venteCancelled.id}/annuler`);
-        await Promise.all([fetchVentesStats(), selectVente()]);
-        toast.success(`Vente ${venteCancelled?.reference} annulée avec succès`)
-        setCancelDialogOpen(false);
-        setVenteCancelled(null);
-      } catch (error: any) {
-        toast.error("Erreur lors de l'annulation");
-        console.error(error.response?.data || error);
-      } finally {
-        setIsCancelling(false)
-      }
-    }
-  }
 
   const handleShowHistory = async (vente: any) => {
     setSelectedVenteHistory(vente);
@@ -895,40 +851,9 @@ export function VentesSection() {
                           <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          {v.statut !== "annule" && (
-                            <Button size="sm" variant="outline" onClick={() => {
-                              setVenteCancelled(v);
-                              setCancelDialogOpen(true);
-                            }}>
-                              <Ban className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button size="sm" variant="outline" onClick={() => handleClick(v)}>
-                            <EyeOff className="h-4 w-4" />
-                          </Button>
                         </div>
                       </div>
                     ))}
-
-                    <DeleteDialog
-                      open={deleteDialogOpen}
-                      openChange={setDeleteDialogOpen}
-                      onConfirm={handleHide}
-                      itemName={`la vente ${venteDelete?.reference}`}
-                      description="Cette vente sera masquée mais pourra être réaffichée plus tard."
-                      isDeleting={isDeleting}
-                      confirmText="Masquer"
-                    />
-
-                    <DeleteDialog
-                      open={cancelDialogOpen}
-                      openChange={setCancelDialogOpen}
-                      onConfirm={handleCancel}
-                      itemName={`la vente ${venteCancelled?.reference}`}
-                      description="Cette vente sera annulée. Cette action est irréversible."
-                      isDeleting={isCancelling}
-                      confirmText="Annuler la vente"
-                    />
 
                     <VenteHistoryDialog
                       open={historyDialogOpen}

@@ -20,6 +20,8 @@ import {
   CheckCircle
 } from "lucide-react";
 import { toast } from 'sonner';
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "../components/Pagination";
 
 interface CommissionResume {
   total_commission: number;
@@ -177,6 +179,14 @@ export function CommissionSection() {
 
   const displayedCommissions = getFilteredByTab();
 
+  // Pagination
+  const {
+    currentPage,
+    totalPages,
+    currentData: paginatedCommissions,
+    setCurrentPage
+  } = usePagination({ data: displayedCommissions, itemsPerPage: 5 });
+
   // ✅ CORRECTION : Utiliser les données du résumé
   const totalCommissionDues = resume.total_commission;
   const totalCommissionPayees = resume.commission_payee;
@@ -321,8 +331,9 @@ export function CommissionSection() {
 
           {/* Liste des commissions */}
           <div className="space-y-4">
-            {displayedCommissions.length > 0 ? (
-              displayedCommissions.map((commission) => (
+            {paginatedCommissions.length > 0 ? (
+              <>
+                {paginatedCommissions.map((commission) => (
                 <Card key={commission.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex flex-col space-y-4">
@@ -376,7 +387,21 @@ export function CommissionSection() {
                     </div>
                   </CardContent>
                 </Card>
-              ))
+              ))}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="pt-4">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={displayedCommissions.length}
+                    itemsPerPage={5}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
+            </>
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

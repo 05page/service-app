@@ -11,10 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert,
+  Plus, Search, Edit, Package, AlertTriangle, TrendingDown, BarChart3, RefreshCw, ShieldAlert,
   Image as ImageIcon, Eye, TrendingUp, PackagePlus, PackageMinus, RotateCcw, History
 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { usePagination } from "@/hooks/usePagination";
 import { Pagination } from "./Pagination";
@@ -54,8 +53,6 @@ export function StockSection() {
   const [prixVente, setPrixVente] = useState("");
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState("");
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [stockDelete, setStockDelete] = useState<any | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detail, setDetail] = useState<any>(null);
 
@@ -225,25 +222,6 @@ export function StockSection() {
     }
   }
 
-  const handleDeleteClick = (stock: any) => {
-    setStockDelete(stock);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (stockDelete) {
-      try {
-        await api.delete(`/stock/${stockDelete.id}`);
-        await Promise.all([fetchStock(), getStock()]);
-        toast.success(`Produit ${stockDelete.code_produit} supprimé avec succès`);
-        setDeleteDialogOpen(false);
-        setStockDelete(null);
-      } catch (error: any) {
-        toast.error("Erreur lors de la suppression");
-        console.error(error.response?.data || error);
-      }
-    }
-  };
 
   // Fonction pour renouveler un stock
   const handleRenewStock = async (stockId: number, achatId: number, commentaire: string) => {
@@ -695,9 +673,6 @@ export function StockSection() {
                           <Button onClick={() => handleEdit(s)} variant="outline" size="sm" title='Modifier'>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button onClick={() => handleDeleteClick(s)} variant="outline" size="sm" title='Supprimer'>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -733,21 +708,6 @@ export function StockSection() {
           )}
         </CardContent>
       </Card>
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer {stockDelete?.code_produit} ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Dialog Détails */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

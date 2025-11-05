@@ -4,19 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Plus,
   Search,
   Mail,
   Phone,
   MapPin,
-  TrendingUp,
   User,
   RefreshCw,
-  Edit,
-  Trash2,
-  ShieldAlert
+  ShieldAlert,
+  Eye,
+  Package
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 // Import du hook et composant de pagination
 import { usePagination } from "../hooks/usePagination";
@@ -32,11 +32,9 @@ export function ClientsSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
 
-  // États du formulaire
-  const [nomClient, setNomClient] = useState("");
-  const [numeroClient, setNumeroClient] = useState("");
-  const [adresseClient, setAdresseClient] = useState("");
-  const [emailClient, setEmailClient] = useState("");
+  // États pour les détails
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [clientDetails, setClientDetails] = useState<any>(null);
 
   const getClient = async () => {
     try {
@@ -74,67 +72,18 @@ export function ClientsSection() {
     }
   }
 
-  const handleEdit = (clientItem: any) => {
-    setSelectedClient(clientItem);
-    setNomClient(clientItem.nom_client || "");
-    setNumeroClient(clientItem.numero || "");
-    setAdresseClient(clientItem.adresse || "");
-    setEmailClient(clientItem.email || "");
-    setEditDialogOpen(true);
-  };
-
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleViewDetails = async (client: any) => {
+    setSelectedClient(client);
+    setDetailDialogOpen(true);
     
-    if (!selectedClient) return;
-    
-    if (!nomClient || !numeroClient || !adresseClient) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-
     try {
-      const response = await api.put(`/clients/${selectedClient.id}`, {
-        nom: nomClient,
-        numero: numeroClient,
-        adresse: adresseClient,
-        email: emailClient || null
-      });
-
-      toast.success(response.data.message || 'Client mis à jour avec succès');
-      resetForm();
-      setSelectedClient(null);
-      setEditDialogOpen(false);
-      getClient();
-      
+      const response = await api.get(`/clients/${client.id}/achats`);
+      setClientDetails(response.data.data);
     } catch (error: any) {
-      console.error('Erreur mise à jour client:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de la mise à jour du client";
-      toast.error(message);
+      console.error('Erreur lors du chargement des détails:', error);
+      toast.error('Erreur lors du chargement des achats du client');
+      setClientDetails(null);
     }
-  };
-
-  const handleDelete = async (clientId: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
-      return;
-    }
-
-    try {
-      const response = await api.delete(`/clients/${clientId}`);
-      toast.success(response.data.message || 'Client supprimé avec succès');
-      getClient();
-    } catch (error: any) {
-      console.error('Erreur suppression client:', error.response?.data);
-      const message = error.response?.data?.message || "Erreur lors de la suppression du client";
-      toast.error(message);
-    }
-  };
-
-  const resetForm = () => {
-    setNomClient("");
-    setNumeroClient("");
-    setAdresseClient("");
-    setEmailClient("");
   };
 
   useEffect(() => {
@@ -282,6 +231,14 @@ export function ClientsSection() {
                         <span className="truncate">{c.adresse}</span>
                       </div>
                     </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-end pt-3 border-t mt-3">
+                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(c)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Détails
+                      </Button>
+                    </div>
                   </div>
                 ))}
 
@@ -315,6 +272,105 @@ export function ClientsSection() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog des détails client */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Détails du client</DialogTitle>
+          </DialogHeader>
+          
+          {selectedClient && (
+            <div className="space-y-6">
+              {/* Informations client */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informations</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Nom</span>
+                    <span className="font-medium">{selectedClient.nom_client}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Téléphone</span>
+                    <span className="font-medium">{selectedClient.numero}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Adresse</span>
+                    <span className="font-medium">{selectedClient.adresse}</span>
+                  </div>
+                  {selectedClient.email && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Email</span>
+                      <span className="font-medium">{selectedClient.email}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total dépensé</span>
+                    <span className="font-bold text-green-600">{selectedClient.montant_verse || 0} Fcfa</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Nombre d'achats</span>
+                    <span className="font-medium">{selectedClient.nombre_ventes || 0}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Historique des achats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Historique des achats</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {clientDetails && clientDetails.length > 0 ? (
+                    <div className="space-y-3">
+                      {clientDetails.map((vente: any) => (
+                        <div key={vente.id} className="border rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-medium">{vente.reference}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(vente.created_at).toLocaleDateString('fr-FR', {
+                                  day: 'numeric',
+                                  month: 'long',
+                                  year: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                            <Badge variant={vente.est_soldee ? "default" : "destructive"}>
+                              {vente.est_soldee ? "Payé" : "Non payé"}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4 mt-3 pt-3 border-t">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Montant total</p>
+                              <p className="font-semibold">{parseFloat(vente.prix_total || 0).toLocaleString('fr-FR')} Fcfa</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Versé</p>
+                              <p className="font-semibold text-green-600">{parseFloat(vente.montant_verse || 0).toLocaleString('fr-FR')} Fcfa</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Reste</p>
+                              <p className="font-semibold text-orange-600">{parseFloat(vente.reste_a_payer || 0).toLocaleString('fr-FR')} Fcfa</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground">Aucun achat pour ce client</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
