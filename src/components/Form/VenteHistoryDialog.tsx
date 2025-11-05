@@ -142,16 +142,13 @@ export function VenteHistoryDialog({ open, onOpenChange, vente, historique }: Ve
                         <div className="flex justify-between items-start mb-1">
                           <div>
                             <p className="font-medium text-green-600">
-                              +{formatCurrency(paiement.montant_paye)} Fcfa
+                              +{formatCurrency(paiement.montant_verse)} Fcfa
                             </p>
                             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                               <Clock className="h-3 w-3" />
-                              {formatDate(paiement.date_reglement)}
+                              {formatDate(paiement.date_paiement)}
                             </p>
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            Paiement #{index + 1}
-                          </Badge>
                         </div>
                         {paiement.commentaire && (
                           <p className="text-sm text-muted-foreground mt-1">{paiement.commentaire}</p>

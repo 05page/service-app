@@ -370,7 +370,7 @@ export function AchatsSection() {
         setCancelDialogOpen(false);
         setAchatCancelled(null);
       } catch (error: any) {
-        toast.error("Erreur lors de l'annulation");
+        toast.error(error.response?.message || "Erreur lors de l'annulation");
         console.error(error.response?.data || error);
       } finally {
         setIsCancelling(false);

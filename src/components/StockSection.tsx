@@ -71,7 +71,7 @@ export function StockSection() {
       const response = await api.get(endpoint);
       setStock(response.data.data);
 
-      const res = await api.get('/achat');
+      const res = await api.get('/achat/achatsDisponibles');
       console.log('Réponse achats:', res.data.data);
       if (res.data.success && res.data.data) {
         console.log("Nombre d'achat trouvés:", res.data.data.length);
