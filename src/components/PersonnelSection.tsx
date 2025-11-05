@@ -87,23 +87,6 @@ export function PersonnelSection() {
     }
   };
 
-  const handleViewDetails = async (personnel: any) => {
-    setSelectedPersonnelDetails(personnel);
-    setLoadingStats(true);
-    setDetailsDialogOpen(true);
-    
-    try {
-      const response = await api.get(`/admin/employe/${personnel.id}/stats`);
-      setPersonnelStats(response.data.data);
-    } catch (error: any) {
-      console.error('Erreur lors du chargement des statistiques:', error);
-      toast.error('Erreur lors du chargement des statistiques');
-      setPersonnelStats(null);
-    } finally {
-      setLoadingStats(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullname || !email || !telephone || !adresse || !role) {
@@ -693,15 +676,6 @@ export function PersonnelSection() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewDetails(employe)}
-                              title="Voir les détails"
-                              className="h-8 w-8 p-0"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
                               onClick={() => handleEdit(employe)}
                               title="Modifier"
                               className="h-8 w-8 p-0"
@@ -769,14 +743,6 @@ export function PersonnelSection() {
         itemName={`${personnelDelete?.fullname}`}
         description="Cela supprimera toutes les actions liées à cet employé. Cette action est irréversible."
         isDeleting={isDeleting}
-      />
-
-      <PersonnelDetailsDialog
-        open={detailsDialogOpen}
-        onOpenChange={setDetailsDialogOpen}
-        personnel={selectedPersonnelDetails}
-        stats={personnelStats}
-        loading={loadingStats}
       />
     </div>
   );

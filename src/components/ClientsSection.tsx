@@ -10,7 +10,6 @@ import {
   MapPin,
   User,
   RefreshCw,
-  ShieldAlert,
   Eye,
   Package
 } from "lucide-react";
@@ -26,11 +25,8 @@ export function ClientsSection() {
   const [refreshing, setRefreshing] = useState(false);
   const [client, setClient] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [accessDenied, setAccessDenied] = useState(false);
 
   // États pour les détails
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -72,18 +68,11 @@ export function ClientsSection() {
     }
   }
 
-  const handleViewDetails = async (client: any) => {
+  const handleViewDetails = (client: any) => {
     setSelectedClient(client);
+    // Les ventes sont déjà dans client.ventes depuis le backend
+    setClientDetails(client.ventes || []);
     setDetailDialogOpen(true);
-    
-    try {
-      const response = await api.get(`/clients/${client.id}/achats`);
-      setClientDetails(response.data.data);
-    } catch (error: any) {
-      console.error('Erreur lors du chargement des détails:', error);
-      toast.error('Erreur lors du chargement des achats du client');
-      setClientDetails(null);
-    }
   };
 
   useEffect(() => {
@@ -300,15 +289,11 @@ export function ClientsSection() {
                     <span className="text-muted-foreground">Adresse</span>
                     <span className="font-medium">{selectedClient.adresse}</span>
                   </div>
-                  {selectedClient.email && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Email</span>
-                      <span className="font-medium">{selectedClient.email}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total dépensé</span>
-                    <span className="font-bold text-green-600">{selectedClient.montant_verse || 0} Fcfa</span>
+                    <span className="font-bold text-green-600">
+                      {parseFloat(selectedClient.montant_verse || 0).toLocaleString('fr-FR')} Fcfa
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Nombre d'achats</span>
@@ -320,40 +305,80 @@ export function ClientsSection() {
               {/* Historique des achats */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Historique des achats</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Historique des achats
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {clientDetails && clientDetails.length > 0 ? (
                     <div className="space-y-3">
                       {clientDetails.map((vente: any) => (
-                        <div key={vente.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-2">
+                        <div key={vente.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-3">
                             <div>
-                              <p className="font-medium">{vente.reference}</p>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="font-semibold text-lg">{vente.reference}</p>
+                              <p className="text-sm text-muted-foreground mt-1">
                                 {new Date(vente.created_at).toLocaleDateString('fr-FR', {
                                   day: 'numeric',
                                   month: 'long',
-                                  year: 'numeric'
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
                                 })}
                               </p>
+                              {vente.commissionnaire && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Vendeur: {vente.commissionnaire.fullname}
+                                </p>
+                              )}
                             </div>
                             <Badge variant={vente.est_soldee ? "default" : "destructive"}>
                               {vente.est_soldee ? "Payé" : "Non payé"}
                             </Badge>
                           </div>
-                          <div className="grid grid-cols-3 gap-4 mt-3 pt-3 border-t">
+
+                          {/* Articles de la vente */}
+                          {vente.items && vente.items.length > 0 && (
+                            <div className="mb-3 p-3 bg-muted/50 rounded-md">
+                              <p className="text-xs font-semibold text-muted-foreground mb-2">Articles achetés:</p>
+                              <div className="space-y-1">
+                                {vente.items.map((item: any, index: number) => (
+                                  <div key={index} className="flex justify-between text-sm">
+                                    <span className="flex-1">
+                                      {item.stock?.achat?.nom_service || 'Article'}
+                                    </span>
+                                    <span className="text-muted-foreground mx-2">
+                                      {item.quantite} × {parseFloat(item.prix_unitaire || 0).toLocaleString('fr-FR')} Fcfa
+                                    </span>
+                                    <span className="font-medium">
+                                      {(item.quantite * parseFloat(item.prix_unitaire || 0)).toLocaleString('fr-FR')} Fcfa
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Montants */}
+                          <div className="grid grid-cols-3 gap-4 pt-3 border-t">
                             <div>
                               <p className="text-xs text-muted-foreground">Montant total</p>
-                              <p className="font-semibold">{parseFloat(vente.prix_total || 0).toLocaleString('fr-FR')} Fcfa</p>
+                              <p className="font-semibold text-lg">
+                                {parseFloat(vente.prix_total || 0).toLocaleString('fr-FR')} Fcfa
+                              </p>
                             </div>
                             <div>
                               <p className="text-xs text-muted-foreground">Versé</p>
-                              <p className="font-semibold text-green-600">{parseFloat(vente.montant_verse || 0).toLocaleString('fr-FR')} Fcfa</p>
+                              <p className="font-semibold text-lg text-green-600">
+                                {parseFloat(vente.montant_verse || 0).toLocaleString('fr-FR')} Fcfa
+                              </p>
                             </div>
                             <div>
                               <p className="text-xs text-muted-foreground">Reste</p>
-                              <p className="font-semibold text-orange-600">{parseFloat(vente.reste_a_payer || 0).toLocaleString('fr-FR')} Fcfa</p>
+                              <p className="font-semibold text-lg text-orange-600">
+                                {parseFloat(vente.reste_a_payer || 0).toLocaleString('fr-FR')} Fcfa
+                              </p>
                             </div>
                           </div>
                         </div>
