@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import {
   Plus, Search, User, Package, Euro, TrendingUp, ShoppingCart, RefreshCw,
   ShieldAlert, ChevronLeft, ChevronRight, Eye, Edit,
-  CreditCard, History
+  CreditCard, History, Ban
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -82,6 +82,11 @@ export function VentesSection() {
   const [selectedVenteHistory, setSelectedVenteHistory] = useState<any>(null);
   const [venteHistorique, setVenteHistorique] = useState<any>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // États pour l'annulation
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [venteToCanel, setVenteToCancel] = useState<any>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
 
   const fetchVentesStats = async () => {
@@ -398,6 +403,29 @@ export function VentesSection() {
       setVenteHistorique(null);
     } finally {
       setLoadingHistory(false);
+    }
+  }
+
+  const handleCancelClick = (vente: any) => {
+    setVenteToCancel(vente);
+    setCancelDialogOpen(true);
+  }
+
+  const handleCancelVente = async () => {
+    if (!venteToCanel) return;
+
+    setIsCancelling(true);
+    try {
+      const response = await api.put(`/ventes/${venteToCanel.id}/annuler`);
+      toast.success(response.data.message || 'Vente annulée avec succès');
+      setCancelDialogOpen(false);
+      setVenteToCancel(null);
+      await Promise.all([fetchVentesStats(), selectVente()]);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'annulation:', error);
+      toast.error(error.response?.data?.message || 'Erreur lors de l\'annulation de la vente');
+    } finally {
+      setIsCancelling(false);
     }
   }
 
@@ -851,6 +879,16 @@ export function VentesSection() {
                           <Button size="sm" variant="outline" onClick={() => handleEdit(v)}>
                             <Edit className="h-4 w-4" />
                           </Button>
+                          {v.statut !== 'annule' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-destructive hover:text-destructive hover:border-destructive"
+                              onClick={() => handleCancelClick(v)}
+                            >
+                              <Ban className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1022,6 +1060,18 @@ export function VentesSection() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog d'annulation */}
+      <DeleteDialog
+        open={cancelDialogOpen}
+        openChange={setCancelDialogOpen}
+        onConfirm={handleCancelVente}
+        title="Annuler cette vente ?"
+        description="Cette action annulera la vente et restaurera les quantités en stock. Les commissions associées seront également annulées."
+        itemName={venteToCanel?.reference}
+        isDeleting={isCancelling}
+        confirmText="Annuler la vente"
+      />
     </div>
   );
 }

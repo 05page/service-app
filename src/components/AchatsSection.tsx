@@ -1,5 +1,6 @@
 import api from '../api/api';
 import { useState, useEffect } from "react";
+import DeleteDialog from "./Form/DeleteDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Plus, Search, Edit, Package, Calendar, TrendingUp, DollarSign,
   RefreshCw, FileText, ShieldAlert, Image as ImageIcon, Eye, X,
-  ChevronLeft, ChevronRight, Upload, Download
+  ChevronLeft, ChevronRight, Upload, Download, Ban
 } from "lucide-react";
 import { toast } from 'sonner';
 import { usePagination } from "../hooks/usePagination";
@@ -64,6 +65,11 @@ export function AchatsSection() {
 
   // Pour la galerie dans les détails
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+  // États pour l'annulation
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [achatToCancel, setAchatToCancel] = useState<any>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const fecthAchats = async () => {
     try {
@@ -359,6 +365,29 @@ export function AchatsSection() {
     setCurrentPhotoIndex(0);
     setDetailDialogOpen(true);
   };
+
+  const handleCancelClick = (achat: any) => {
+    setAchatToCancel(achat);
+    setCancelDialogOpen(true);
+  }
+
+  const handleCancelAchat = async () => {
+    if (!achatToCancel) return;
+
+    setIsCancelling(true);
+    try {
+      const response = await api.put(`/achat/${achatToCancel.id}/annuler`);
+      toast.success(response.data.message || 'Achat annulé avec succès');
+      setCancelDialogOpen(false);
+      setAchatToCancel(null);
+      await Promise.all([fecthAchats(), getAchats()]);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'annulation:', error);
+      toast.error(error.response?.data?.message || 'Erreur lors de l\'annulation de l\'achat');
+    } finally {
+      setIsCancelling(false);
+    }
+  }
 
   useEffect(() => {
     if (fournisseurId) {
@@ -877,6 +906,17 @@ export function AchatsSection() {
                         <Button onClick={() => handleEdit(a)} variant="outline" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {a.statut !== 'annule' && (
+                          <Button 
+                            onClick={() => handleCancelClick(a)} 
+                            variant="outline" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:border-destructive"
+                            title="Annuler"
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1046,6 +1086,18 @@ export function AchatsSection() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog d'annulation */}
+      <DeleteDialog
+        open={cancelDialogOpen}
+        openChange={setCancelDialogOpen}
+        onConfirm={handleCancelAchat}
+        title="Annuler cet achat ?"
+        description="Cette action annulera l'achat. Si cet achat est lié à un stock, il ne pourra pas être annulé."
+        itemName={achatToCancel?.numero_achat}
+        isDeleting={isCancelling}
+        confirmText="Annuler l'achat"
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from '../api/api';
 import DeleteDialog from "./Form/DeleteDialog";
+import { PersonnelDetailsDialog } from "./Form/PersonnelDetailsDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Plus, Search, Edit, Trash2, Phone, Mail, User, Calendar, RefreshCw, Power, PowerOff,
-  TrendingUp, CreditCard, Package, Users, Briefcase
+  TrendingUp, CreditCard, Package, Users, Briefcase, Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -30,6 +31,12 @@ export function PersonnelSection() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [filterTab, setFilterTab] = useState("all")
+
+  // États pour les détails du personnel
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedPersonnelDetails, setSelectedPersonnelDetails] = useState<any>(null);
+  const [personnelStats, setPersonnelStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   // Formulaire
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -77,6 +84,23 @@ export function PersonnelSection() {
       toast.error('Erreur lors de l\'actualisation');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleViewDetails = async (personnel: any) => {
+    setSelectedPersonnelDetails(personnel);
+    setLoadingStats(true);
+    setDetailsDialogOpen(true);
+    
+    try {
+      const response = await api.get(`/admin/employe/${personnel.id}/stats`);
+      setPersonnelStats(response.data.data);
+    } catch (error: any) {
+      console.error('Erreur lors du chargement des statistiques:', error);
+      toast.error('Erreur lors du chargement des statistiques');
+      setPersonnelStats(null);
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -669,6 +693,15 @@ export function PersonnelSection() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => handleViewDetails(employe)}
+                              title="Voir les détails"
+                              className="h-8 w-8 p-0"
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleEdit(employe)}
                               title="Modifier"
                               className="h-8 w-8 p-0"
@@ -736,6 +769,14 @@ export function PersonnelSection() {
         itemName={`${personnelDelete?.fullname}`}
         description="Cela supprimera toutes les actions liées à cet employé. Cette action est irréversible."
         isDeleting={isDeleting}
+      />
+
+      <PersonnelDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        personnel={selectedPersonnelDetails}
+        stats={personnelStats}
+        loading={loadingStats}
       />
     </div>
   );
