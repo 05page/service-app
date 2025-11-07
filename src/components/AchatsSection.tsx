@@ -79,7 +79,7 @@ export function AchatsSection() {
         console.error('token non trouvé');
       }
       const role = localStorage.getItem("userRole");
-      const endpoint = role === "admin" ? "/allStats" : "/achat/stats";
+      const endpoint = role === "admin" ? "/allStats" : "allStats";
       const response = await api.get(endpoint);
       setSelectCount(response.data.data);
 

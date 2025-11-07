@@ -23,6 +23,7 @@ type VentesStats = {
   total_ventes: number,
   vente_en_attente: number,
   ventes_paye: number,
+  ventes_regles:number,
   ventes_annule: number,
   mes_clients: number,
   total_commissions: number,
@@ -192,7 +193,7 @@ export const DashboardEmployee = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {myStats?.ventes_paye || 0}
+              {myStats?.ventes_regles || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Ventes confirmées et payées
@@ -295,7 +296,7 @@ export const DashboardEmployee = () => {
               {/* Ventes payées */}
               <div className="text-center">
                 <p className="text-2xl font-bold text-green-600">
-                  {myStats.ventes_paye}
+                  {myStats.ventes_regles || 0}
                 </p>
                 <p className="text-xs text-muted-foreground">Payées</p>
               </div>

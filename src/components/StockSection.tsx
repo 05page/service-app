@@ -65,7 +65,7 @@ export function StockSection() {
         return
       }
       const role = localStorage.getItem("userRole");
-      const endpoint = role === "admin" ? "/allStats" : "/stock/stats"
+      const endpoint = role === "admin" ? "/allStats" : "/allStats"
       const response = await api.get(endpoint);
       setStock(response.data.data);
 
