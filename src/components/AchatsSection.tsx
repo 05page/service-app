@@ -841,6 +841,7 @@ export function AchatsSection() {
                 <SelectItem value="commande">Commande</SelectItem>
                 <SelectItem value="paye">Payé</SelectItem>
                 <SelectItem value="reçu">Reçu</SelectItem>
+                <SelectItem value="annule">Annulé</SelectItem>
               </SelectContent>
             </Select>
             <Select value={selectedPeriode} onValueChange={setSelectedPeriode}>
