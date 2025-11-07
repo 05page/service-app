@@ -769,7 +769,7 @@ export function AchatsSection() {
       </div>
 
       {/* Statistiques */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Commandes</CardTitle>
@@ -781,11 +781,11 @@ export function AchatsSection() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Achat</CardTitle>
+            <CardTitle className="text-sm font-medium">Non Reçus</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{(selectCount?.total_achats ?? 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold text-orange-600">{(selectCount?.achats_non_recu ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -795,6 +795,15 @@ export function AchatsSection() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{(selectCount?.total_achats_recu ?? 0).toLocaleString()}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Achats Annules</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{(selectCount?.achats_annule ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -950,7 +959,6 @@ export function AchatsSection() {
           )}
         </CardContent>
       </Card>
-
 
       {/* Dialog Détails avec Galerie */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

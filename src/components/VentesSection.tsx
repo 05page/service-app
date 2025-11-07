@@ -118,7 +118,6 @@ export function VentesSection() {
     try {
       const response = await api.get('/ventes/');
       setSelectVentes(response.data.data || []);
-      console.log("Liste des ventes", response.data.data);
     } catch (error: any) {
       console.error('Erreur survenue lors de la récupération des ventes', error);
       if (error.response?.status === 403) {
