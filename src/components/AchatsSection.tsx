@@ -41,6 +41,7 @@ export function AchatsSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectAchat, setSelectAchat] = useState<any>(null);
+  const userRole = localStorage.getItem("userRole");
 
   const [fournisseurId, setFournisseurId] = useState("");
   const [typeService, setTypeService] = useState("");
@@ -912,19 +913,23 @@ export function AchatsSection() {
                         <Button onClick={() => openDetailDialog(a)} variant="outline" size="sm" title='Détails'>
                           <Eye className='h-4 w-4' />
                         </Button>
-                        <Button onClick={() => handleEdit(a)} variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {a.statut !== 'annule' && (
-                          <Button 
-                            onClick={() => handleCancelClick(a)} 
-                            variant="outline" 
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:border-destructive"
-                            title="Annuler"
-                          >
-                            <Ban className="h-4 w-4" />
-                          </Button>
+                        {userRole === "admin" && (
+                          <>
+                            <Button onClick={() => handleEdit(a)} variant="outline" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {a.statut !== 'annule' && (
+                              <Button 
+                                onClick={() => handleCancelClick(a)} 
+                                variant="outline" 
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:border-destructive"
+                                title="Annuler"
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </TableCell>

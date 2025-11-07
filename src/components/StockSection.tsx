@@ -55,6 +55,7 @@ export function StockSection() {
   const [photo, setPhoto] = useState("");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detail, setDetail] = useState<any>(null);
+  const userRole = localStorage.getItem("userRole");
 
   const fetchStock = async () => {
     try {
@@ -651,7 +652,7 @@ export function StockSection() {
                           >
                             <History className="h-4 w-4" />
                           </Button>
-                          {(s.statut === 'rupture' || s.statut === 'alerte') && (
+                          {(s.statut === 'rupture' || s.statut === 'alerte') && userRole === "admin" && (
                             <Button 
                               onClick={() => handleRenewClick(s)} 
                               variant="outline" 
@@ -670,9 +671,11 @@ export function StockSection() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button onClick={() => handleEdit(s)} variant="outline" size="sm" title='Modifier'>
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          {userRole === "admin" && (
+                            <Button onClick={() => handleEdit(s)} variant="outline" size="sm" title='Modifier'>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -6,12 +6,26 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DollarSign, TrendingUp, Clock, CheckCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "@/components/Pagination";
 
 export function CommissionEmployeeSection() {
   const [commissions, setCommissions] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const {
+    currentPage,
+    totalPages,
+    currentData,
+    goToNextPage,
+    goToPreviousPage,
+    goToPage
+  } = usePagination({
+    data: commissions,
+    itemsPerPage: 5
+  });
 
   const fetchCommissions = async () => {
     try {
@@ -166,8 +180,8 @@ export function CommissionEmployeeSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {commissions && commissions.length > 0 ? (
-                commissions.map((commission: any, index: number) => (
+              {currentData && currentData.length > 0 ? (
+                currentData.map((commission: any, index: number) => (
                   <TableRow key={index}>
                     <TableCell className="font-medium">
                       {commission.reference_vente || 'N/A'}
@@ -213,6 +227,17 @@ export function CommissionEmployeeSection() {
               )}
             </TableBody>
           </Table>
+          {commissions && commissions.length > 0 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={goToPage}
+                totalItems={commissions.length}
+                itemsPerPage={5}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
