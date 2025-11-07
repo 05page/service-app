@@ -770,7 +770,7 @@ export function AchatsSection() {
       </div>
 
       {/* Statistiques */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className={`grid gap-4 ${userRole === "admin" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Commandes</CardTitle>
@@ -807,15 +807,17 @@ export function AchatsSection() {
             <div className="text-2xl font-bold text-red-600">{(selectCount?.achats_annule ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Montant Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{(selectCount?.total_prix_achats ?? 0).toLocaleString('fr-FR')} Fcfa</div>
-          </CardContent>
-        </Card>
+        {userRole === "admin" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Montant Total</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{(selectCount?.total_prix_achats ?? 0).toLocaleString('fr-FR')} Fcfa</div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Filtres et recherche */}

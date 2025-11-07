@@ -479,7 +479,7 @@ export function StockSection() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className={`grid gap-4 md:grid-cols-3 ${userRole === "admin" ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Articles</CardTitle>
@@ -525,15 +525,17 @@ export function StockSection() {
             <div className="text-2xl font-bold text-red-600">{stock?.total_sorties_stock}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valeur Stock</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stock?.total_valeur_stock?.toLocaleString() || 0} Fcfa</div>
-          </CardContent>
-        </Card>
+        {userRole === "admin" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Valeur Stock</CardTitle>
+              <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stock?.total_valeur_stock?.toLocaleString() || 0} Fcfa</div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card>
