@@ -639,7 +639,7 @@ export function StockSection() {
                           {s?.sortie_stock}
                         </Badge>
                       </TableCell>
-                      <TableCell>{s.achat?.prix_unitaire || 0} Fcfa</TableCell>
+                      <TableCell>{s?.achat?.items && s.achat.items.length > 0 ? s.achat.items[0].prix_unitaire.toLocaleString() : 0} Fcfa</TableCell>
                       <TableCell>{s.prix_vente} Fcfa</TableCell>
                       <TableCell>
                         <Badge variant={getStatutColor(s.statut)}>{getStatutLabel(s.statut)}</Badge>
@@ -752,7 +752,7 @@ export function StockSection() {
                 <div className="flex-1 grid gap-3">
                   <div>
                     <p className="text-sm text-muted-foreground">Article</p>
-                    <p className="font-medium">{detail.achat?.nom_service}</p>
+                    <p className="font-medium">{detail?.achat?.items && detail.achat.items.length > 0 ? detail.achat.items[0].nom_service : "Non défini"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Code produit</p>
@@ -785,7 +785,7 @@ export function StockSection() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Prix d'achat unitaire</p>
-                  <p className="font-medium">{detail.achat?.prix_unitaire?.toLocaleString() || 0} Fcfa</p>
+                  <p className="font-medium">{detail?.achat?.items && detail.achat.items.length > 0 ? detail.achat.items[0].prix_unitaire.toLocaleString() : 0} Fcfa</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Prix de vente</p>

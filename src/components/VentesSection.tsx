@@ -16,8 +16,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { usePagination } from "../hooks/usePagination";
-import { Pagination } from "../components/Pagination";
 
 type ItemVente = {
   stock_id: string;

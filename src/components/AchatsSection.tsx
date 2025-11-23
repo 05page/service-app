@@ -26,7 +26,20 @@ type Achats = {
   total_prix_achats: number
 }
 
+type ItemAchat = {
+  quantite: string,
+  prix_unitaire: string,
+  prix_total: string,
+  date_commande: string,
+  date_livraison: string
+}
+
 export function AchatsSection() {
+  //Ajout de plusieurs articles:
+  const [achatItems, setAchatIems] = useState<ItemAchat[]>([
+    { quantite: "", prix_unitaire: "", prix_total: "", date_commande: "", date_livraison: "" }
+  ]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
   const [selectedPeriode, setSelectedPeriode] = useState<string>("ce_mois");
@@ -86,6 +99,7 @@ export function AchatsSection() {
       const res = await api.get('/fournisseurs')
       if (res.data.success && res.data.data) {
         setFournisseur(res.data.data);
+        console.log(res.data.data)
       } else {
         setFournisseur([]);
       }
@@ -423,7 +437,7 @@ export function AchatsSection() {
   const getStatutLabel = (statut: string) => {
     switch (statut) {
       case "commande": return "Commande";
-      case "paye": return "Payé";
+      case "partiellement_recu": return "Partiellement Reçu";
       case "reçu": return "Reçu";
       case "annule": return "Annulé";
       default: return statut;
@@ -883,7 +897,9 @@ export function AchatsSection() {
                     <TableCell>{a.fournisseur?.nom_fournisseurs}</TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{a.nom_service}</div>
+                        <div className="font-medium">
+                          {a.items && a.items.length > 0 ? a.items[0].nom_service : 'Non défini'}
+                        </div>
                         <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
                       </div>
                     </TableCell>
@@ -901,14 +917,14 @@ export function AchatsSection() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>{a.quantite}</TableCell>
-                    <TableCell>{a.prix_unitaire} Fcfa</TableCell>
-                    <TableCell className="font-medium">{a.prix_total} Fcfa</TableCell>
+                    <TableCell>{a.items && a.items.length > 0 ? a.items[0].quantite : "Non defini"}</TableCell>
+                    <TableCell>{a.items && a.items.length > 0 ? a.items[0].prix_unitaire : '000'} Fcfa</TableCell>
+                    <TableCell className="font-medium">{a.items && a.items.length > 0 ? a.items[0].prix_total : "000"} Fcfa</TableCell>
                     <TableCell>
                       <Badge variant={getStatutColor(a.statut)}>{getStatutLabel(a.statut)}</Badge>
                     </TableCell>
                     <TableCell>
-                      {a.date_livraison ? new Date(a.date_livraison).toLocaleDateString('fr-FR') :
+                      {a.items && a.items.length > 0 && a.items[0].date_livraison ? new Date(a.items[0].date_livraison).toLocaleDateString('fr-FR') :
                         <span className="text-muted-foreground">Non définie</span>}
                     </TableCell>
                     <TableCell>
@@ -922,9 +938,9 @@ export function AchatsSection() {
                               <Edit className="h-4 w-4" />
                             </Button>
                             {a.statut !== 'annule' && (
-                              <Button 
-                                onClick={() => handleCancelClick(a)} 
-                                variant="outline" 
+                              <Button
+                                onClick={() => handleCancelClick(a)}
+                                variant="outline"
                                 size="sm"
                                 className="text-destructive hover:text-destructive hover:border-destructive"
                                 title="Annuler"
@@ -1044,21 +1060,21 @@ export function AchatsSection() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Service</p>
-                    <p className="font-medium">{detail.nom_service}</p>
+                    <p className="font-medium">{detail.items && detail.items.length > 0 ? detail.items[0].nom_service : 'Non défini'}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-sm text-muted-foreground">Quantité</p>
-                      <p className="font-medium">{detail.quantite}</p>
+                      <p className="font-medium">{detail.items && detail.items.length > 0 ? detail.items[0].quantite : 'Non défini'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Prix unitaire</p>
-                      <p className="font-medium">{detail.prix_unitaire?.toLocaleString()} Fcfa</p>
+                      <p className="font-medium">{detail.items && detail.items.length > 0 ? detail.items[0].prix_unitaire?.toLocaleString() : 'Non défini'} Fcfa</p>
                     </div>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Prix total</p>
-                    <p className="text-2xl font-bold">{detail.prix_total?.toLocaleString()} Fcfa</p>
+                    <p className="text-2xl font-bold">{detail.items && detail.items.length > 0 ? detail.items[0].prix_total?.toLocaleString() : 'Non défini'} Fcfa</p>
                   </div>
                 </div>
               </div>
@@ -1066,14 +1082,20 @@ export function AchatsSection() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Date de commande</p>
-                  <p className="font-medium">{new Date(detail.date_commande).toLocaleDateString('fr-FR')}</p>
+                  <p className="font-medium">
+                    {detail.items && detail.items.length > 0 && detail.items[0].date_commande
+                      ? new Date(detail.items[0].date_commande).toLocaleDateString('fr-FR')
+                      : "Non définie"
+                    }
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Date de livraison</p>
                   <p className="font-medium">
-                    {detail.date_livraison
-                      ? new Date(detail.date_livraison).toLocaleDateString('fr-FR')
-                      : "Non définie"}
+                    {detail.items && detail.items.length > 0 && detail.items[0].date_livraison
+                      ? new Date(detail.items[0].date_livraison).toLocaleDateString('fr-FR')
+                      : "Non définie"
+                    }
                   </p>
                 </div>
                 <div>

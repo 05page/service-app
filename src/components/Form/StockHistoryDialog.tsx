@@ -65,7 +65,7 @@ export default function StockHistoryDialog({ open, onOpenChange, historique }: S
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Article</p>
-                    <p className="font-semibold">{stock?.achat?.nom_service}</p>
+                    <p className="font-semibold">{stock?.achat?.items && stock.achat.items.length > 0  ? stock.achat.items[0].nom_service : "Non défini"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Code produit</p>
@@ -94,7 +94,7 @@ export default function StockHistoryDialog({ open, onOpenChange, historique }: S
             </Card>
 
             {/* Statistiques */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2">
@@ -124,17 +124,6 @@ export default function StockHistoryDialog({ open, onOpenChange, historique }: S
                     <div>
                       <p className="text-sm text-muted-foreground">Renouvellements</p>
                       <p className="text-2xl font-bold text-blue-600">{statistiques?.nombre_renouvellements}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-8 w-8 text-purple-500" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Achats liés</p>
-                      <p className="text-2xl font-bold text-purple-600">{statistiques?.nombre_achats}</p>
                     </div>
                   </div>
                 </CardContent>
