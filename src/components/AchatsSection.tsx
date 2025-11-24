@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner';
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
-
+import FormAchat from "./Form/FormAchat";
 type Achats = {
   total_achat_commande: number,
   total_achats: number,
@@ -145,29 +145,9 @@ export function AchatsSection() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fournisseurId || !typeService || !quantite || !prixUnitaire || !dateCommande || !statut) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-    setIsSubmitting(true)
+  // Fonction pour gérer la soumission
+  const handleFormSubmit = async (formData: FormData) => {
     try {
-      const formData = new FormData();
-      formData.append('fournisseur_id', fournisseurId);
-      formData.append('nom_service', typeService);
-      formData.append('quantite', quantite);
-      formData.append('prix_unitaire', prixUnitaire);
-      formData.append('date_commande', dateCommande);
-      if (dateLivraison) formData.append('date_livraison', dateLivraison);
-      formData.append('statut', statut);
-      if (description) formData.append('description', description);
-
-      // Ajouter les photos
-      photoFiles.forEach((file) => {
-        formData.append('photos[]', file);
-      });
-
       const response = await api.post('/achat/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -175,124 +155,21 @@ export function AchatsSection() {
       });
 
       toast.success(response.data.message || 'Achat créé avec succès');
-      resetForm();
       setDialogOpen(false);
-      getAchats();
-      fecthAchats();
+      await Promise.all([getAchats(), fecthAchats()]);
     } catch (error: any) {
       console.error('Erreur création achat:', error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de l'ajout de l'achat";
       toast.error(message);
-    } finally {
-      setIsSubmitting(false)
+      throw error; // Important pour que le formulaire sache que ça a échoué
     }
-  }
-  // Gestion des photos existantes et nouvelles
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const newFiles = Array.from(files);
-    const totalPhotos = existingPhotos.length - photosToDelete.length + photoFiles.length + newFiles.length;
-
-    if (totalPhotos > 4) {
-      toast.error('Vous ne pouvez avoir que 4 photos maximum');
-      return;
-    }
-
-    // Vérifier la taille et le type de chaque fichier
-    const validFiles = newFiles.filter(file => {
-      if (file.size > 2048 * 1024) {
-        toast.error(`${file.name} est trop volumineux (max 2MB)`);
-        return false;
-      }
-      if (!['image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(file.type)) {
-        toast.error(`${file.name} n'est pas un format valide`);
-        return false;
-      }
-      return true;
-    });
-
-    if (validFiles.length === 0) return;
-
-    setPhotoFiles(prev => [...prev, ...validFiles]);
-
-    // Créer les previews
-    const newPreviews = validFiles.map(file => URL.createObjectURL(file));
-    setPhotoPreviews(prev => [...prev, ...newPreviews]);
   };
 
-  const removePhoto = (index: number) => {
-    setPhotoFiles(prev => prev.filter((_, i) => i !== index));
-    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Supprimer une photo existante (marquer pour suppression)
-  const removeExistingPhoto = (photoId: number) => {
-    setPhotosToDelete(prev => [...prev, photoId]);
-  };
-
-  const handleEdit = (upAchat: any) => {
-    setSelectAchat(upAchat);
-    setFournisseurId(upAchat.fournisseur_id?.toString() || "");
-    setTypeService(upAchat.nom_service || "");
-    setQuantite(upAchat.quantite?.toString() || "");
-    setPrixUnitaire(upAchat.prix_unitaire?.toString() || "");
-    setDateCommande(upAchat.date_commande || "");
-    setDateLivraison(upAchat.date_livraison || "");
-    setStatut(upAchat.statut || "");
-    setDescription(upAchat.description || "");
-    // Charger les photos existantes
-    const photos = upAchat.photos || [];
-    setExistingPhotos(upAchat.photos || []);
-    setPhotosToDelete([]);
-    setPhotoFiles([]);
-    // Construire les previews pour affichage
-    const previews = photos.map(photo => photo.path); // utiliser directement le path reçu du backend
-    setPhotoPreviews(previews);
-    setEditDialogOpen(true);
-  };
-
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Fonction pour gérer la mise à jour
+  const handleFormUpdate = async (formData: FormData) => {
     if (!selectAchat) return;
 
-    if (!fournisseurId || !typeService || !quantite || !prixUnitaire || !dateCommande || !statut) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-
-    // Vérifier le nombre total de photos
-    const totalPhotos = existingPhotos.length - photosToDelete.length + photoFiles.length;
-    if (totalPhotos > 4) {
-      toast.error('Vous ne pouvez avoir que 4 photos maximum');
-      return;
-    }
-
-    setIsSubmitting(true);
     try {
-      const formData = new FormData();
-
-      // Ajouter les données de base
-      formData.append('fournisseur_id', fournisseurId);
-      formData.append('nom_service', typeService);
-      formData.append('quantite', quantite);
-      formData.append('prix_unitaire', prixUnitaire);
-      formData.append('date_commande', dateCommande);
-      if (dateLivraison) formData.append('date_livraison', dateLivraison);
-      formData.append('statut', statut);
-      if (description) formData.append('description', description);
-
-      // Ajouter les nouvelles photos
-      photoFiles.forEach((file, index) => {
-        formData.append('photos[]', file);
-      });
-
-      // Ajouter les IDs des photos à supprimer
-      if (photosToDelete.length > 0) {
-        formData.append('photos_to_delete', JSON.stringify(photosToDelete));
-      }
-
       const response = await api.post(`/achat/${selectAchat.id}?_method=PUT`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -301,18 +178,14 @@ export function AchatsSection() {
 
       toast.success(response.data.message || "Achat mis à jour");
       setEditDialogOpen(false);
-      resetForm();
-      await fecthAchats();
-      await getAchats();
+      await Promise.all([getAchats(), fecthAchats()]);
     } catch (error: any) {
       console.error(error.response?.data);
       const message = error?.response?.data?.message || "Erreur survenue lors de la mise à jour de l'achat";
       toast.error(message);
-    } finally {
-      setIsSubmitting(false);
+      throw error;
     }
   };
-
   const resetForm = () => {
     setFournisseurId("");
     setTypeService("");
@@ -516,271 +389,63 @@ export function AchatsSection() {
           <p className="text-muted-foreground">Gérez vos commandes et achats de services</p>
         </div>
         <div className="flex gap-2">
+          {/* Bouton Refresh */}
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}>
+
+          {/* Dialog création */}
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 Nouvelle Commande
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle commande</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Fournisseur *</Label>
-                    {fournisseur.length > 0 ? (
-                      <Select value={fournisseurId} onValueChange={setFournisseurId} required>
-                        <SelectTrigger><SelectValue placeholder="Sélectionner un fournisseur" /></SelectTrigger>
-                        <SelectContent>
-                          {fournisseur.map((f: any) => (
-                            <SelectItem key={f.id} value={f.id.toString()}>{f.nom_fournisseurs}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select disabled><SelectTrigger><SelectValue placeholder="Aucun fournisseur" /></SelectTrigger></Select>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Service *</Label>
-                    <Input value={typeService} onChange={(e) => setTypeService(e.target.value)}
-                      placeholder="Service" disabled className="bg-muted" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Quantité *</Label>
-                    <Input value={quantite} onChange={(e) => setQuantite(e.target.value)}
-                      type="number" min="1" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Prix unitaire *</Label>
-                    <Input value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)}
-                      type="number" min="100" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Prix total</Label>
-                    <Input value={prixTotal} type="number" disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Date de commande *</Label>
-                    <Input value={dateCommande} onChange={(e) => setDateCommande(e.target.value)} type="date" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Date de livraison</Label>
-                    <Input value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)} type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Statut *</Label>
-                    <Select value={statut} onValueChange={setStatut} required>
-                      <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="commande">Commande</SelectItem>
-                        <SelectItem value="paye">Payé</SelectItem>
-                        <SelectItem value="reçu">Reçu</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label>Description</Label>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-                  </div>
 
-                  {/* Section Photos */}
-                  <div className="col-span-2 space-y-2">
-                    <Label>Photos (Maximum 4)</Label>
-                    <div className="border-2 border-dashed rounded-lg p-4">
-                      <input
-                        type="file"
-                        id="photos"
-                        accept="image/jpeg,image/png,image/jpg,image/webp"
-                        multiple
-                        onChange={handlePhotoChange}
-                        className="hidden"
-                        disabled={photoFiles.length >= 4}
-                      />
-                      <label
-                        htmlFor="photos"
-                        className={`flex flex-col items-center justify-center cursor-pointer ${photoFiles.length >= 4 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                        <span className="text-sm text-muted-foreground">
-                          Cliquez pour ajouter des photos ({photoFiles.length}/4)
-                        </span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          JPEG, PNG, JPG, WEBP (max 2MB)
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Preview des photos */}
-                    {photoPreviews.length > 0 && (
-                      <div className="grid grid-cols-4 gap-2 mt-2">
-                        {photoPreviews.map((preview, index) => (
-                          <div key={index} className="relative group">
-                            <img
-                              src={preview}
-                              alt={`Preview ${index + 1}`}
-                              className="w-full h-24 object-cover rounded"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removePhoto(index)}
-                              className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type='button' variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                    Annuler
-                  </Button>
-                  <Button type='submit' disabled={isSubmitting}>
-                    {isSubmitting ? <><RefreshCw className="animate-spin h-4 w-4 mr-2" />Création...</> : "Créer"}
-                  </Button>
-                </div>
-              </form>
+              <FormAchat
+                fournisseurs={fournisseur}
+                onSubmit={handleFormSubmit}
+                onCancel={() => setDialogOpen(false)}
+                isSubmitting={isSubmitting}
+              />
             </DialogContent>
           </Dialog>
 
-          <Dialog open={editDialogOpen} onOpenChange={(open) => {
-            setEditDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Modifier</DialogTitle></DialogHeader>
-              <form onSubmit={handleUpdate}>
-                {/* Même structure que le formulaire de création */}
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Fournisseur *</Label>
-                    <Select value={fournisseurId} onValueChange={setFournisseurId} required>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {fournisseur.map((f: any) => (
-                          <SelectItem key={f.id} value={f.id.toString()}>{f.nom_fournisseurs}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Service *</Label>
-                    <Input value={typeService} onChange={(e) => setTypeService(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Quantité *</Label>
-                    <Input value={quantite} onChange={(e) => setQuantite(e.target.value)} type="number" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Prix unitaire *</Label>
-                    <Input value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)} type="number" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Date de commande *</Label>
-                    <Input value={dateCommande} onChange={(e) => setDateCommande(e.target.value)} type="date" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Date de livraison</Label>
-                    <Input value={dateLivraison} onChange={(e) => setDateLivraison(e.target.value)} type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Statut *</Label>
-                    <Select value={statut} onValueChange={setStatut} required>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="commande">Commande</SelectItem>
-                        <SelectItem value="paye">Payé</SelectItem>
-                        <SelectItem value="reçu">Reçu</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label>Description</Label>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-                  </div>
-                  {/* Section Photos */}
-                  <div className="col-span-2 space-y-2">
-                    <Label>Photos (Maximum 4)</Label>
-                    {/* Zone d'ajout de nouvelles photos */}
-                    <div className="border-2 border-dashed rounded-lg p-4">
-                      <input
-                        type="file"
-                        id="photos-edit"
-                        accept="image/jpeg,image/png,image/jpg,image/webp"
-                        multiple
-                        onChange={handlePhotoChange}
-                        className="hidden"
-                        disabled={
-                          existingPhotos.length - photosToDelete.length + photoFiles.length >= 4
-                        }
-                      />
-                      <label
-                        htmlFor="photos-edit"
-                        className={`flex flex-col items-center justify-center cursor-pointer ${existingPhotos.length - photosToDelete.length + photoFiles.length >= 4
-                          ? 'opacity-50 cursor-not-allowed'
-                          : ''
-                          }`}
-                      >
-                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                        <span className="text-sm text-muted-foreground">
-                          Ajouter des photos ({existingPhotos.length - photosToDelete.length + photoFiles.length}/4)
-                        </span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          JPEG, PNG, JPG, WEBP (max 2MB)
-                        </span>
-                      </label>
-                    </div>
+          {/* Dialog d'édition */}
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Modifier la commande</DialogTitle>
+              </DialogHeader>
 
-                    {/* Preview des nouvelles photos */}
-                    {photoPreviews.length > 0 && (
-                      <div>
-                        <div className="grid grid-cols-4 gap-2">
-                          {photoPreviews.map((preview, index) => (
-                            <div key={index} className="relative group">
-                              <img
-                                src={preview}
-                                alt={`Nouvelle photo ${index + 1}`}
-                                className="w-full h-24 object-cover rounded"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removePhoto(index)}
-                                className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type='button' variant="outline" onClick={() => { setEditDialogOpen(false); resetForm(); }}>
-                    Annuler
-                  </Button>
-                  <Button type='submit' disabled={isSubmitting}>
-                    {isSubmitting ? <><RefreshCw className="animate-spin h-4 w-4 mr-2" />Mise à jour...</> : "Modifier"}
-                  </Button>
-                </div>
-              </form>
+              <FormAchat
+                isEdit
+                fournisseurs={fournisseur}
+                initialData={
+                  selectAchat
+                    ? {
+                      fournisseur_id: selectAchat.fournisseur_id?.toString(),
+                      statut: selectAchat.statut,
+                      description: selectAchat.description,
+                      items: selectAchat.items
+                    }
+                    : undefined
+                }
+                onSubmit={handleFormUpdate}
+                onCancel={() => setEditDialogOpen(false)}
+                isSubmitting={isSubmitting}
+              />
             </DialogContent>
           </Dialog>
         </div>
+
       </div>
 
       {/* Statistiques */}
@@ -934,7 +599,7 @@ export function AchatsSection() {
                         </Button>
                         {userRole === "admin" && (
                           <>
-                            <Button onClick={() => handleEdit(a)} variant="outline" size="sm">
+                            <Button variant="outline" size="sm">
                               <Edit className="h-4 w-4" />
                             </Button>
                             {a.statut !== 'annule' && (
