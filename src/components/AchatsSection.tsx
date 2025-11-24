@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Search, Edit, Package, Calendar, TrendingUp, DollarSign,
   RefreshCw, FileText, ShieldAlert, Image as ImageIcon, Eye, X,
@@ -19,7 +20,10 @@ import { toast } from 'sonner';
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
 import FormAchat from "./Form/FormAchat";
+
 type Achats = {
+  achats_non_recu: number;
+  achats_annule: number;
   total_achat_commande: number,
   total_achats: number,
   total_achats_recu: number,
@@ -44,12 +48,13 @@ export function AchatsSection() {
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
   const [selectedPeriode, setSelectedPeriode] = useState<string>("ce_mois");
   const [accessDenied, setAccessDenied] = useState(false);
+  const [activeTab, setActiveTab] = useState("total");
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [achat, setchAchat] = useState([]);
   const [fournisseur, setFournisseur] = useState<any[]>([]);
-  const [selectCount, setSelectCount] = useState(null);
+  const [selectCount, setSelectCount] = useState<Achats | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -349,8 +354,221 @@ export function AchatsSection() {
     return matchSearch && matchStatut && matchPeriode;
   });
 
+  const getTabFilteredData = () => {
+    switch (activeTab) {
+      case "commande":
+        return filteredAchats.filter((a: any) => a.statut === 'commande');
+      case "reception":
+        return filteredAchats.filter((a: any) => a.statut === 'reçu' || a.statut === 'partiellement_recu');
+      default:
+        return filteredAchats;
+    }
+  };
+
+  const tabData = getTabFilteredData();
+
   const { currentPage, totalPages, currentData: currentAchats, setCurrentPage } =
-    usePagination({ data: filteredAchats, itemsPerPage: 6 });
+    usePagination({ data: tabData, itemsPerPage: 6 });
+
+  // Reset pagination when tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
+  const renderAchatsTable = () => {
+    if (activeTab === 'total') {
+      return (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Commande</TableHead>
+              <TableHead>Fournisseur</TableHead>
+              <TableHead>Service</TableHead>
+              <TableHead>Photos</TableHead>
+              <TableHead>Quantité</TableHead>
+              <TableHead>Prix unitaire</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead>Livraison</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {currentAchats.length > 0 ? (
+              currentAchats.map((a: any) => (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{a.numero_achat}</div>
+                      <div className="text-sm text-muted-foreground">{new Date(a.created_at).toLocaleString()}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{a.fournisseur?.nom_fournisseurs}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">
+                        {a.items && a.items.length > 0 ? a.items[0].nom_service : 'Non défini'}
+                      </div>
+                      <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {a.photos && a.photos.length > 0 ? (
+                      <div className="flex items-center gap-1">
+                        <img src={a.photos[0].path} alt='produit' className='h-10 w-10 object-cover rounded' />
+                        {a.photos.length > 1 && (
+                          <span className="text-xs text-muted-foreground">+{a.photos.length - 1}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>{a.items && a.items.length > 0 ? a.items[0].quantite : "Non defini"}</TableCell>
+                  <TableCell>{a.items && a.items.length > 0 ? a.items[0].prix_unitaire : '000'} Fcfa</TableCell>
+                  <TableCell className="font-medium">{a.items && a.items.length > 0 ? a.items[0].prix_total : "000"} Fcfa</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatutColor(a.statut)}>{getStatutLabel(a.statut)}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {a.items && a.items.length > 0 && a.items[0].date_livraison ? new Date(a.items[0].date_livraison).toLocaleDateString('fr-FR') :
+                      <span className="text-muted-foreground">Non définie</span>}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button onClick={() => openDetailDialog(a)} variant="outline" size="sm" title='Détails'>
+                        <Eye className='h-4 w-4' />
+                      </Button>
+                      {userRole === "admin" && (
+                        <>
+                          <Button variant="outline" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {a.statut !== 'annule' && (
+                            <Button
+                              onClick={() => handleCancelClick(a)}
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:border-destructive"
+                              title="Annuler"
+                            >
+                              <Ban className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={10} className="h-[400px]">
+                  <div className="flex flex-col items-center justify-center">
+                    <Package className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">Aucun achat disponible</h3>
+                    <p className="text-sm text-muted-foreground text-center mb-6">
+                      {searchTerm || selectedStatut !== "tous" || selectedPeriode !== "tous"
+                        ? "Aucun achat ne correspond à vos critères de recherche."
+                        : "Vous n'avez pas encore effectué d'achat. Créez votre premier achat pour commencer."}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      );
+    } else {
+      // Columns for 'commande' and 'reception' tabs
+      const isCommandeTab = activeTab === 'commande';
+      const dateHeader = isCommandeTab ? "Date Commande" : "Date Réception";
+      const docHeader = isCommandeTab ? "Bon de Commande" : "Bon de Réception";
+
+      return (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Commande</TableHead>
+              <TableHead>Fournisseur</TableHead>
+              <TableHead>Service</TableHead>
+              <TableHead>{dateHeader}</TableHead>
+              <TableHead>{docHeader}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {currentAchats.length > 0 ? (
+              currentAchats.map((a: any) => (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{a.numero_achat}</div>
+                      <div className="text-sm text-muted-foreground">{new Date(a.created_at).toLocaleString()}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{a.fournisseur?.nom_fournisseurs}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">
+                        {a.items && a.items.length > 0 ? a.items[0].nom_service : 'Non défini'}
+                      </div>
+                      <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {isCommandeTab ? (
+                      a.items && a.items.length > 0 && a.items[0].date_commande ? new Date(a.items[0].date_commande).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
+                    ) : (
+                      a.items && a.items.length > 0 && a.items[0].date_livraison ? new Date(a.items[0].date_livraison).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {isCommandeTab ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadFacture(a.id)}
+                        title="Télécharger Bon de Commande"
+                      >
+                        <FileText className="h-4 w-4 text-primary mr-2" />
+                        <span className="text-xs">PDF</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadFacture(a.id)}
+                        title="Télécharger Bon de Réception"
+                      >
+                        <FileText className="h-4 w-4 text-green-600 mr-2" />
+                        <span className="text-xs">PDF</span>
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="h-[400px]">
+                  <div className="flex flex-col items-center justify-center">
+                    <Package className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">Aucun achat disponible</h3>
+                    <p className="text-sm text-muted-foreground text-center mb-6">
+                      {searchTerm || selectedStatut !== "tous" || selectedPeriode !== "tous"
+                        ? "Aucun achat ne correspond à vos critères de recherche."
+                        : "Vous n'avez pas encore effectué d'achat. Créez votre premier achat pour commencer."}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      );
+    }
+  };
 
   if (loading) {
     return (
@@ -534,113 +752,30 @@ export function AchatsSection() {
               </SelectContent>
             </Select>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Commande</TableHead>
-                <TableHead>Fournisseur</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Photos</TableHead>
-                <TableHead>Quantité</TableHead>
-                <TableHead>Prix unitaire</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Livraison</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentAchats.length > 0 ? (
-                currentAchats.map((a: any) => (
-                  <TableRow key={a.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{a.numero_achat}</div>
-                        <div className="text-sm text-muted-foreground">{new Date(a.created_at).toLocaleString()}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{a.fournisseur?.nom_fournisseurs}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {a.items && a.items.length > 0 ? a.items[0].nom_service : 'Non défini'}
-                        </div>
-                        <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {a.photos && a.photos.length > 0 ? (
-                        <div className="flex items-center gap-1">
-                          <img src={a.photos[0].path} alt='produit' className='h-10 w-10 object-cover rounded' />
-                          {a.photos.length > 1 && (
-                            <span className="text-xs text-muted-foreground">+{a.photos.length - 1}</span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
-                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{a.items && a.items.length > 0 ? a.items[0].quantite : "Non defini"}</TableCell>
-                    <TableCell>{a.items && a.items.length > 0 ? a.items[0].prix_unitaire : '000'} Fcfa</TableCell>
-                    <TableCell className="font-medium">{a.items && a.items.length > 0 ? a.items[0].prix_total : "000"} Fcfa</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatutColor(a.statut)}>{getStatutLabel(a.statut)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {a.items && a.items.length > 0 && a.items[0].date_livraison ? new Date(a.items[0].date_livraison).toLocaleDateString('fr-FR') :
-                        <span className="text-muted-foreground">Non définie</span>}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button onClick={() => openDetailDialog(a)} variant="outline" size="sm" title='Détails'>
-                          <Eye className='h-4 w-4' />
-                        </Button>
-                        {userRole === "admin" && (
-                          <>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            {a.statut !== 'annule' && (
-                              <Button
-                                onClick={() => handleCancelClick(a)}
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive hover:text-destructive hover:border-destructive"
-                                title="Annuler"
-                              >
-                                <Ban className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={10} className="h-[400px]">
-                    <div className="flex flex-col items-center justify-center">
-                      <Package className="h-16 w-16 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold text-muted-foreground mb-2">Aucun achat disponible</h3>
-                      <p className="text-sm text-muted-foreground text-center mb-6">
-                        {searchTerm || selectedStatut !== "tous" || selectedPeriode !== "tous"
-                          ? "Aucun achat ne correspond à vos critères de recherche."
-                          : "Vous n'avez pas encore effectué d'achat. Créez votre premier achat pour commencer."}
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="total">Liste Total</TabsTrigger>
+              <TabsTrigger value="commande">Bon de Commande</TabsTrigger>
+              <TabsTrigger value="reception">Bon de Reception</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="total">
+              {renderAchatsTable()}
+            </TabsContent>
+            <TabsContent value="commande">
+              {renderAchatsTable()}
+            </TabsContent>
+            <TabsContent value="reception">
+              {renderAchatsTable()}
+            </TabsContent>
+          </Tabs>
+
           {currentAchats.length > 0 && (
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={filteredAchats.length}
+              totalItems={tabData.length}
               itemsPerPage={6}
               onPageChange={setCurrentPage}
               className="mt-4"
