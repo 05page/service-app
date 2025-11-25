@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from '../api/api';
 import DeleteDialog from "./Form/DeleteDialog";
+import FormFournisseur from "./Form/FormFournisseur";
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,46 +10,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin, RefreshCw, PowerOff, Power, Building } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin, RefreshCw, PowerOff, Power, Building, Tag } from "lucide-react";
 import { toast } from "sonner";
-
-interface Fournisseur {
-  id: string;
-  nom: string;
-  email: string;
-  telephone: string;
-  adresse: string;
-  statut: "actif" | "inactif";
-  typeServices: string;
-  dateCreation: string;
-  totalCommandes: number;
-  montantTotal: number;
-}
 
 export function FournisseursSection() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatut, setSelectedStatut] = useState<string>("tous");
-
   const [refreshing, setRefreshing] = useState(false);
   const [fournisseur, setFournisseurs] = useState([]);
-  const [selectStats, setSelectStats] = useState(null);
+  const [selectStats, setSelectStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedFournisseur, setSelectedFournisseur] = useState<any>(null);
-  const [fournisseurDelete, setFournisseurDelete] = useState<any | null>(null)
+  const [fournisseurDelete, setFournisseurDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-
-  // Formulaire
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [nomFournisseurs, setNomFournisseurs] = useState("");
-  const [email, setEmail] = useState("");
-  const [telephone, setTelephone] = useState("");
-  const [adresse, setAdresse] = useState("");
-  const [description, setDescription] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const getFournisseur = async () => {
     try {
@@ -91,98 +70,70 @@ export function FournisseursSection() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nomFournisseurs || !email || !adresse || !description) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-    setIsSubmitting(true)
+  // ✅ Gestion de la création avec FormFournisseur
+  const handleCreateSubmit = async (data: any) => {
+    setIsSubmitting(true);
     try {
-      const response = await api.post('/fournisseurs/', {
-        nom_fournisseurs: nomFournisseurs,
-        email,
-        telephone,
-        adresse,
-        description,
-      });
-
-      toast.success(response.data.message);
-      resetForm();
+      const response = await api.post('/fournisseurs/', data);
+      toast.success(response.data.message || 'Fournisseur créé avec succès');
       setDialogOpen(false);
-      getFournisseur();
+      await getFournisseur();
     } catch (error: any) {
       console.error(error.response?.data);
       const message = error.response?.data?.message || "Erreur survenue lors de l'ajout du fournisseur";
       toast.error(message);
+      throw error; // Important pour que le formulaire sache que ça a échoué
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   };
 
+  // ✅ Gestion de la modification avec FormFournisseur
   const handleEdit = (fournisseurItem: any) => {
     setSelectedFournisseur(fournisseurItem);
-    setNomFournisseurs(fournisseurItem.nom_fournisseurs || "");
-    setEmail(fournisseurItem.email || "");
-    setTelephone(fournisseurItem.telephone || "");
-    setAdresse(fournisseurItem.adresse || "");
-    setDescription(fournisseurItem.description || "");
     setEditDialogOpen(true);
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleUpdateSubmit = async (data: any) => {
     if (!selectedFournisseur) return;
 
-    if (!nomFournisseurs || !email || !adresse || !description) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
-      const response = await api.put(`/fournisseurs/${selectedFournisseur.id}`, {
-        nom_fournisseurs: nomFournisseurs,
-        email,
-        telephone,
-        adresse,
-        description
-      });
-
+      const response = await api.put(`/fournisseurs/${selectedFournisseur.id}`, data);
       toast.success(response.data.message || 'Fournisseur mis à jour avec succès');
-      resetForm();
-      setSelectedFournisseur(null);
       setEditDialogOpen(false);
-      getFournisseur();
-
+      setSelectedFournisseur(null);
+      await getFournisseur();
     } catch (error: any) {
       console.error('Erreur mise à jour fournisseur:', error.response?.data);
       const message = error.response?.data?.message || "Erreur lors de la mise à jour du fournisseur";
       toast.error(message);
+      throw error;
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   };
 
   const handleClick = (fs: any) => {
-    setFournisseurDelete(fs)
-    setDeleteDialogOpen(true)
-  }
+    setFournisseurDelete(fs);
+    setDeleteDialogOpen(true);
+  };
 
   const handleDelete = async () => {
-    if (fournisseurDelete) {
-      try {
-        await api.delete(`/fournisseurs/${fournisseurDelete.id}`);
-        await getFournisseur();
-        toast.success(`Fournisseur ${fournisseurDelete.nom_fournisseurs} supprimé avec succès`);
-        setDeleteDialogOpen(false)
-        setFournisseurDelete(null)
-      } catch (error: any) {
-        toast.error("Erreur lors de la suppression");
-        console.error(error.response?.data || error);
-      } finally {
-        setIsDeleting(false)
-      }
+    if (!fournisseurDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await api.delete(`/fournisseurs/${fournisseurDelete.id}`);
+      await getFournisseur();
+      toast.success(`Fournisseur ${fournisseurDelete.nom_fournisseurs} supprimé avec succès`);
+      setDeleteDialogOpen(false);
+      setFournisseurDelete(null);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Erreur lors de la suppression");
+      console.error(error.response?.data || error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -198,33 +149,28 @@ export function FournisseursSection() {
     try {
       const response = await api.post(`/fournisseurs/${action}/${fournisseurId}`);
       toast.success(response.data.message);
-      getFournisseur();
+      await getFournisseur();
     } catch (error: any) {
       console.error('Erreur:', error.response?.data);
       toast.error(error.response?.data?.message || 'Erreur lors du changement de statut');
     }
   };
 
-  const resetForm = () => {
-    setNomFournisseurs("");
-    setEmail("");
-    setTelephone("");
-    setAdresse("");
-    setDescription("");
-  };
-
   useEffect(() => {
     getFournisseur();
   }, []);
 
-  // Filtrage des fournisseurs
+  // ✅ Filtrage amélioré pour gérer les services en tableau
   const filteredFournisseurs = fournisseur.filter((f: any) => {
-    const matchesSearch = f.nom_fournisseurs?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = 
+      f.nom_fournisseurs?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       f.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.telephone?.includes(searchTerm);
+      f.telephone?.includes(searchTerm) ||
+      // Recherche dans les services (tableau)
+      (Array.isArray(f.services) && f.services.some((s: string) => 
+        s.toLowerCase().includes(searchTerm.toLowerCase())
+      ));
 
-    // Correction du filtrage par statut pour correspondre aux valeurs booléennes du serveur
     const matchesStatut = selectedStatut === "tous" ||
       (selectedStatut === "actif" && f.actif === true) ||
       (selectedStatut === "inactif" && f.actif === false);
@@ -237,8 +183,7 @@ export function FournisseursSection() {
     totalPages,
     currentData: currentFournisseur,
     setCurrentPage
-  } = usePagination({ data: filteredFournisseurs, itemsPerPage: 6 })
-
+  } = usePagination({ data: filteredFournisseurs, itemsPerPage: 6 });
 
   if (loading) {
     return (
@@ -246,7 +191,7 @@ export function FournisseursSection() {
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-            <p className="text-muted-foreground">Chargement de la liste de fournisseur...</p>
+            <p className="text-muted-foreground">Chargement de la liste de fournisseurs...</p>
           </CardContent>
         </Card>
       </div>
@@ -271,6 +216,7 @@ export function FournisseursSection() {
             Actualiser
           </Button>
 
+          {/* Dialog de création */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -278,179 +224,47 @@ export function FournisseursSection() {
                 Nouveau Fournisseur
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Ajouter un nouveau fournisseur</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nom">Nom de l'entreprise *</Label>
-                    <Input
-                      id="nom"
-                      value={nomFournisseurs}
-                      onChange={(e) => setNomFournisseurs(e.target.value)}
-                      placeholder="Nom du fournisseur"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="contact@fournisseur.com"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="telephone">Téléphone</Label>
-                    <Input
-                      id="telephone"
-                      value={telephone}
-                      onChange={(e) => setTelephone(e.target.value)}
-                      placeholder="+225 01 02 03 04 05"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="adresse">Adresse *</Label>
-                    <Input
-                      id="adresse"
-                      value={adresse}
-                      onChange={(e) => setAdresse(e.target.value)}
-                      placeholder="Ex: Yopougon"
-                      required
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="description">Type de service *</Label>
-                    <Input
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Ex: Services Informatiques"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setDialogOpen(false);
-                      resetForm();
-                    }}
-                  >
-                    Annuler
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <span className="flex items-center">
-                        <RefreshCw className="animate-spin h-4 w-4 mr-2" />
-                        Ajout...
-                      </span>
-                    ) : (
-                      "Ajouter un fournisseur"
-                    )}
-                  </Button>
-                </div>
-              </form>
+              <FormFournisseur
+                onSubmit={handleCreateSubmit}
+                onCancel={() => setDialogOpen(false)}
+                isSubmitting={isSubmitting}
+              />
             </DialogContent>
           </Dialog>
 
-          {/* Dialog d'édition */}
+          {/* Dialog de modification */}
           <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Modifier le fournisseur</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleUpdate}>
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-nom">Nom de l'entreprise *</Label>
-                    <Input
-                      id="edit-nom"
-                      value={nomFournisseurs}
-                      onChange={(e) => setNomFournisseurs(e.target.value)}
-                      placeholder="Nom du fournisseur"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-email">Email *</Label>
-                    <Input
-                      id="edit-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="contact@fournisseur.com"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-telephone">Téléphone</Label>
-                    <Input
-                      id="edit-telephone"
-                      value={telephone}
-                      onChange={(e) => setTelephone(e.target.value)}
-                      placeholder="+225 01 02 03 04 05"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-adresse">Adresse *</Label>
-                    <Input
-                      id="edit-adresse"
-                      value={adresse}
-                      onChange={(e) => setAdresse(e.target.value)}
-                      placeholder="Ex: Yopougon"
-                      required
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="edit-description">Type de service *</Label>
-                    <Input
-                      id="edit-description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Ex: Services Informatiques"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setEditDialogOpen(false);
-                      setSelectedFournisseur(null);
-                      resetForm();
-                    }}
-                  >
-                    Annuler
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <span className="flex items-center">
-                        <RefreshCw className="animate-spin h-4 w-4 mr-2" />
-                        Mise à jour...
-                      </span>
-                    ) : (
-                      "Mettre à jour"
-                    )}
-                  </Button>
-                </div>
-              </form>
+              <FormFournisseur
+                isEdit
+                initialData={selectedFournisseur ? {
+                  nom_fournisseurs: selectedFournisseur.nom_fournisseurs,
+                  email: selectedFournisseur.email,
+                  telephone: selectedFournisseur.telephone,
+                  adresse: selectedFournisseur.adresse,
+                  services: selectedFournisseur.services
+                } : undefined}
+                onSubmit={handleUpdateSubmit}
+                onCancel={() => {
+                  setEditDialogOpen(false);
+                  setSelectedFournisseur(null);
+                }}
+                isSubmitting={isSubmitting}
+              />
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
       {/* Statistiques */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Fournisseurs</CardTitle>
@@ -463,6 +277,7 @@ export function FournisseursSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Fournisseurs Actifs</CardTitle>
+            <Power className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{selectStats?.total_fournisseurs_actifs || 0}</div>
@@ -471,6 +286,7 @@ export function FournisseursSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Commandes ce mois</CardTitle>
+            <Tag className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{selectStats?.total_commande || 0}</div>
@@ -490,7 +306,7 @@ export function FournisseursSection() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Rechercher par nom, email ou type de service..."
+                  placeholder="Rechercher par nom, email ou service..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -514,99 +330,107 @@ export function FournisseursSection() {
               <TableRow>
                 <TableHead>Fournisseur</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Type de services</TableHead>
+                <TableHead>Services proposés</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredFournisseurs && filteredFournisseurs.length > 0 ? (
-                <>
-                  {currentFournisseur.map((f: any) => (
-                    <TableRow key={f.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{f.nom_fournisseurs}</div>
-                          <div className="text-sm text-muted-foreground flex items-center mt-1">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {f.adresse}
-                          </div>
+              {currentFournisseur && currentFournisseur.length > 0 ? (
+                currentFournisseur.map((f: any) => (
+                  <TableRow key={f.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{f.nom_fournisseurs}</div>
+                        <div className="text-sm text-muted-foreground flex items-center mt-1">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {f.adresse}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-3 w-3 mr-1" />
+                          {f.email}
+                        </div>
+                        {f.telephone && (
                           <div className="flex items-center text-sm">
-                            <Mail className="h-3 w-3 mr-1" />
-                            {f.email}
+                            <Phone className="h-3 w-3 mr-1" />
+                            {f.telephone}
                           </div>
-                          {f.telephone && (
-                            <div className="flex items-center text-sm">
-                              <Phone className="h-3 w-3 mr-1" />
-                              {f.telephone}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{f.description}</TableCell>
-                      <TableCell>
-                        <Badge variant={f.actif ? "default" : "secondary"}>
-                          {f.actif ? "Actif" : "Inactif"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {/* ✅ Affichage des services en badges */}
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(f.services) ? (
+                          f.services.slice(0, 3).map((service: string, index: number) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {service}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Aucun service</span>
+                        )}
+                        {Array.isArray(f.services) && f.services.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{f.services.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={f.actif ? "default" : "secondary"}>
+                        {f.actif ? "Actif" : "Inactif"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(f)}
+                          title="Modifier"
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleClick(f)}
+                          title="Supprimer"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                        {f.actif ? (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEdit(f)}
-                            title="Modifier"
-                            className="h-8 w-8 p-0"
+                            onClick={() => handleToggleStatus(f.id, "desactive")}
+                            title="Désactiver"
+                            className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
                           >
-                            <Edit className="h-3 w-3" />
+                            <PowerOff className="h-3 w-3" />
                           </Button>
+                        ) : (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleClick(f)}
-                            title="Supprimer"
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:border-red-300"
+                            onClick={() => handleToggleStatus(f.id, "reactive")}
+                            title="Réactiver"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Power className="h-3 w-3" />
                           </Button>
-                          <DeleteDialog
-                            open={deleteDialogOpen}
-                            openChange={setDeleteDialogOpen}
-                            onConfirm={handleDelete}
-                            itemName={`la commande ${fournisseurDelete?.numero_achat}`}
-                            description="Cela supprimera toutes les actions liés à cet fournisseur. Cette action est irréversible."
-                            isDeleting={isDeleting}
-                          />
-                          {f.actif ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleToggleStatus(f.id, "desactive")}
-                              title="Désactiver"
-                              className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:border-orange-300"
-                            >
-                              <PowerOff className="h-3 w-3" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleToggleStatus(f.id, "reactive")}
-                              title="Réactiver"
-                              className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:border-green-300"
-                            >
-                              <Power className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12">
@@ -619,7 +443,7 @@ export function FournisseursSection() {
                     </h3>
                     <p className="text-sm text-muted-foreground text-center mb-6">
                       {searchTerm || selectedStatut !== "tous"
-                        ? `Aucun fournisseur ne correspond à vos critères de recherche`
+                        ? 'Aucun fournisseur ne correspond à vos critères de recherche'
                         : 'Vous n\'avez pas encore de fournisseur. Ajoutez votre premier fournisseur pour commencer.'
                       }
                     </p>
@@ -628,20 +452,32 @@ export function FournisseursSection() {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {currentFournisseur && currentFournisseur.length > 0 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredFournisseurs.length}
+                itemsPerPage={6}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
         </CardContent>
-        {/* Composant de pagination réutilisable */}
-        {currentFournisseur && currentFournisseur.length > 0 && (
-          <div className="mt-4">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredFournisseurs.length}
-              itemsPerPage={6}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        )}
       </Card>
+
+      {/* Dialog de suppression */}
+      <DeleteDialog
+        open={deleteDialogOpen}
+        openChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Supprimer ce fournisseur ?"
+        itemName={fournisseurDelete?.nom_fournisseurs}
+        description="Cela supprimera toutes les actions liées à ce fournisseur. Cette action est irréversible."
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

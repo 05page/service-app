@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 // Interface pour un article
 interface AchatItem {
+  id?: number; // ID de l'item (pour la mise à jour)
   nom_service: string;
   quantite: string;
   prix_unitaire: string;
@@ -18,6 +19,8 @@ interface AchatItem {
   date_livraison: string;
   photos: File[];
   photoPreviews: string[];
+  existingPhotoIds: number[]; // IDs des photos existantes
+  photosToDelete: number[]; // IDs des photos à supprimer
 }
 
 // Props du composant
@@ -57,7 +60,9 @@ export default function FormAchat({
       date_commande: "",
       date_livraison: "",
       photos: [],
-      photoPreviews: []
+      photoPreviews: [],
+      existingPhotoIds: [],
+      photosToDelete: []
     }
   ]);
 
@@ -65,25 +70,96 @@ export default function FormAchat({
   const availableServices = useMemo(() => {
     if (!fournisseurId) return [];
     const fournisseur = fournisseurs.find(f => f.id.toString() === fournisseurId);
-    if (!fournisseur || !fournisseur.description) return [];
-    // On suppose que les services sont séparés par des virgules dans la description
-    return fournisseur.description.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+
+    // ✅ Les services sont maintenant un tableau
+    if (!fournisseur || !fournisseur.services || !Array.isArray(fournisseur.services)) {
+      return [];
+    }
+
+    return fournisseur.services;
   }, [fournisseurId, fournisseurs]);
+  // Fonction pour formater une date ISO en format YYYY-MM-DD pour les inputs date
+  const formatDateForInput = (dateString: string | null | undefined): string => {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "";
+      return date.toISOString().split('T')[0];
+    } catch {
+      return "";
+    }
+  };
 
   // Charger les données initiales en mode édition
   useEffect(() => {
-    if (isEdit && initialData?.items && initialData.items.length > 0) {
-      const formattedItems = initialData.items.map((item: any) => ({
-        nom_service: item.nom_service || "",
-        quantite: item.quantite?.toString() || "",
-        prix_unitaire: item.prix_unitaire?.toString() || "",
-        prix_total: item.prix_total?.toString() || "",
-        date_commande: item.date_commande || "",
-        date_livraison: item.date_livraison || "",
-        photos: [],
-        photoPreviews: item.photos?.map((p: any) => p.path) || []
-      }));
-      setItems(formattedItems);
+    if (isEdit && initialData) {
+      // Charger le fournisseur et la description
+      if (initialData.fournisseur_id) {
+        setFournisseurId(initialData.fournisseur_id);
+      }
+      if (initialData.description) {
+        setDescription(initialData.description);
+      }
+
+      // Charger les items
+      if (initialData.items && initialData.items.length > 0) {
+        const formattedItems = initialData.items.map((item: any) => {
+          // Fonction pour construire l'URL complète de la photo
+          const getPhotoUrl = (path: string) => {
+            if (!path) return "";
+            // Si le chemin commence déjà par http, le retourner tel quel
+            if (path.startsWith('http://') || path.startsWith('https://')) {
+              return path;
+            }
+            // Si le chemin commence par /, on l'utilise tel quel
+            if (path.startsWith('/')) {
+              const baseURL = 'http://127.0.0.1:8000';
+              return baseURL + path;
+            }
+            // Sinon, ajouter l'URL de base
+            const baseURL = 'http://127.0.0.1:8000/';
+            // Si le chemin commence par storage/, on l'ajoute tel quel
+            // Sinon, on ajoute storage/ devant
+            const fullPath = path.startsWith('storage/') ? path : `storage/${path}`;
+            return baseURL + fullPath;
+          };
+
+          // Debug: afficher les données de l'item
+          console.log('Item chargé:', {
+            id: item.id,
+            nom_service: item.nom_service,
+            photos: item.photos,
+            photosCount: item.photos?.length || 0
+          });
+
+          // Récupérer les photos de l'item
+          // Les photos peuvent être dans item.photos (relation chargée)
+          const itemPhotos = item.photos || [];
+
+          console.log('Photos trouvées pour l\'item:', itemPhotos);
+
+          return {
+            id: item.id,
+            nom_service: item.nom_service || "",
+            quantite: item.quantite?.toString() || "",
+            prix_unitaire: item.prix_unitaire?.toString() || "",
+            prix_total: item.prix_total?.toString() || "",
+            date_commande: formatDateForInput(item.date_commande),
+            date_livraison: formatDateForInput(item.date_livraison),
+            photos: [],
+            photoPreviews: itemPhotos.map((p: any) => {
+              const photoPath = p.path || p;
+              const url = typeof photoPath === 'string' ? getPhotoUrl(photoPath) : "";
+              console.log('Photo URL construite:', { original: photoPath, url });
+              return url;
+            }).filter((url: string) => url !== ""),
+            existingPhotoIds: itemPhotos.map((p: any) => p.id || p).filter((id: any) => id !== undefined && id !== null) || [],
+            photosToDelete: []
+          };
+        });
+        console.log('Items formatés:', formattedItems);
+        setItems(formattedItems);
+      }
     }
   }, [isEdit, initialData]);
 
@@ -97,7 +173,9 @@ export default function FormAchat({
       date_commande: "",
       date_livraison: "",
       photos: [],
-      photoPreviews: []
+      photoPreviews: [],
+      existingPhotoIds: [],
+      photosToDelete: []
     }]);
   };
 
@@ -132,7 +210,8 @@ export default function FormAchat({
 
     const newFiles = Array.from(files);
     const currentItem = items[itemIndex];
-    const totalPhotos = currentItem.photos.length + newFiles.length;
+    const existingPhotosCount = currentItem.existingPhotoIds?.length || 0;
+    const totalPhotos = existingPhotosCount + currentItem.photos.length + newFiles.length;
 
     if (totalPhotos > 4) {
       toast.error('Maximum 4 photos par article');
@@ -164,8 +243,35 @@ export default function FormAchat({
   // Supprimer une photo d'un article
   const removeItemPhoto = (itemIndex: number, photoIndex: number) => {
     const newItems = [...items];
-    newItems[itemIndex].photos = newItems[itemIndex].photos.filter((_, i) => i !== photoIndex);
-    newItems[itemIndex].photoPreviews = newItems[itemIndex].photoPreviews.filter((_, i) => i !== photoIndex);
+    const item = newItems[itemIndex];
+
+    // Déterminer si c'est une photo existante ou nouvelle
+    // Les photos existantes sont au début de photoPreviews
+    if (photoIndex < item.existingPhotoIds.length) {
+      // C'est une photo existante - la marquer pour suppression
+      const photoIdToDelete = item.existingPhotoIds[photoIndex];
+      if (photoIdToDelete && !item.photosToDelete.includes(photoIdToDelete)) {
+        item.photosToDelete.push(photoIdToDelete);
+      }
+      // Retirer de existingPhotoIds
+      item.existingPhotoIds = item.existingPhotoIds.filter((_, i) => i !== photoIndex);
+    } else {
+      // C'est une nouvelle photo - calculer l'index dans le tableau photos
+      const newPhotoIndex = photoIndex - item.existingPhotoIds.length;
+      // Retirer le fichier et libérer l'URL de l'objet
+      const fileToRemove = item.photos[newPhotoIndex];
+      if (fileToRemove) {
+        const previewUrl = item.photoPreviews[photoIndex];
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      }
+      item.photos = item.photos.filter((_, i) => i !== newPhotoIndex);
+    }
+
+    // Retirer de photoPreviews dans tous les cas
+    item.photoPreviews = item.photoPreviews.filter((_, i) => i !== photoIndex);
+
     setItems(newItems);
   };
 
@@ -210,6 +316,11 @@ export default function FormAchat({
 
     // Ajouter les items
     items.forEach((item, index) => {
+      // Si c'est une mise à jour, envoyer l'ID de l'item
+      if (isEdit && item.id) {
+        formData.append(`items[${index}][id]`, item.id.toString());
+      }
+
       formData.append(`items[${index}][nom_service]`, item.nom_service);
       formData.append(`items[${index}][quantite]`, item.quantite);
       formData.append(`items[${index}][prix_unitaire]`, item.prix_unitaire);
@@ -218,7 +329,14 @@ export default function FormAchat({
         formData.append(`items[${index}][date_livraison]`, item.date_livraison);
       }
 
-      // Ajouter les photos de cet item
+      // Ajouter les IDs des photos à supprimer
+      if (item.photosToDelete && item.photosToDelete.length > 0) {
+        item.photosToDelete.forEach((photoId) => {
+          formData.append(`items[${index}][photos_to_delete][]`, photoId.toString());
+        });
+      }
+
+      // Ajouter les nouvelles photos de cet item
       item.photos.forEach((photo) => {
         formData.append(`items[${index}][photos][]`, photo);
       });
@@ -410,7 +528,7 @@ export default function FormAchat({
                       multiple
                       onChange={(e) => handleItemPhotoChange(index, e)}
                       className="hidden"
-                      disabled={item.photos.length >= 4}
+                      disabled={(item.existingPhotoIds?.length || 0) + item.photos.length >= 4}
                     />
                     <label
                       htmlFor={`photos-${index}`}
@@ -419,7 +537,7 @@ export default function FormAchat({
                     >
                       <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                       <span className="text-sm text-muted-foreground">
-                        Cliquez pour ajouter des photos ({item.photos.length}/4)
+                        Cliquez pour ajouter des photos ({(item.existingPhotoIds?.length || 0) + item.photos.length}/4)
                       </span>
                       <span className="text-xs text-muted-foreground mt-1">
                         JPEG, PNG, JPG, WEBP (max 2MB par photo)
@@ -436,6 +554,14 @@ export default function FormAchat({
                             src={preview}
                             alt={`Article ${index + 1} - Photo ${photoIndex + 1}`}
                             className="w-full h-24 object-cover rounded border-2 border-border"
+                            onError={(e) => {
+                              console.error('Erreur de chargement de l\'image:', preview);
+                              // Optionnel: masquer l'image en cas d'erreur
+                              // e.currentTarget.style.display = 'none';
+                            }}
+                            onLoad={() => {
+                              console.log('Image chargée avec succès:', preview);
+                            }}
                           />
                           <button
                             type="button"

@@ -1,5 +1,5 @@
 import api from '../api/api';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DeleteDialog from "./Form/DeleteDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Search, Edit, Package, Calendar, TrendingUp, DollarSign,
   RefreshCw, FileText, ShieldAlert, Image as ImageIcon, Eye, X,
-  ChevronLeft, ChevronRight, Upload, Download, Ban
+  ChevronLeft, ChevronRight, Upload, Download, Ban, Loader2
 } from "lucide-react";
 import { toast } from 'sonner';
 import { usePagination } from "../hooks/usePagination";
@@ -26,6 +26,7 @@ type Achats = {
   achats_annule: number;
   total_achat_commande: number,
   total_achats: number,
+  bon_commande: string,
   total_achats_recu: number,
   total_prix_achats: number
 }
@@ -89,6 +90,23 @@ export function AchatsSection() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [achatToCancel, setAchatToCancel] = useState<any>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // Upload states
+  const [uploadingAchatId, setUploadingAchatId] = useState<number | null>(null);
+  const [uploadType, setUploadType] = useState<'commande' | 'reception' | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // États pour le modal de bon de réception
+  const [bonReceptionDialogOpen, setBonReceptionDialogOpen] = useState(false);
+  const [achatForBonReception, setAchatForBonReception] = useState<any>(null);
+  const [bonReceptionItems, setBonReceptionItems] = useState<Array<{
+    id: number;
+    nom_service: string;
+    quantite: number;
+    quantite_recu: string;
+    bon_reception_file: File | null;
+  }>>([]);
+  const [isSubmittingBonReception, setIsSubmittingBonReception] = useState(false);
 
   const fecthAchats = async () => {
     try {
@@ -282,6 +300,151 @@ export function AchatsSection() {
     }
   }
 
+  const handleFileSelect = (achatId: number, type: 'commande' | 'reception') => {
+    if (type === 'commande') {
+      // Ouvrir le modal pour le bon de réception depuis l'onglet "Bon de Commande"
+      const selectedAchat = achat.find((a: any) => a.id === achatId);
+      if (selectedAchat && selectedAchat.items) {
+        setAchatForBonReception(selectedAchat);
+        // Initialiser les items avec les données existantes
+        const itemsData = selectedAchat.items.map((item: any) => ({
+          id: item.id,
+          nom_service: item.nom_service || '',
+          quantite: item.quantite || 0,
+          quantite_recu: item.quantite_recu?.toString() || '',
+          bon_reception_file: null as File | null
+        }));
+        setBonReceptionItems(itemsData);
+        setBonReceptionDialogOpen(true);
+      }
+    } else {
+      // Pour le bon de réception, garder l'ancien comportement (si nécessaire)
+      setUploadingAchatId(achatId);
+      setUploadType(type);
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !uploadingAchatId || !uploadType) return;
+
+    const formData = new FormData();
+    const key = uploadType === 'commande' ? 'bon_commande' : 'bon_reception';
+    formData.append(key, file);
+
+    try {
+      toast.info("Envoi du document en cours...");
+      const response = await api.post(`/achat/${uploadingAchatId}?_method=PUT`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      toast.success(response.data.message || "Document ajouté avec succès");
+      await Promise.all([getAchats(), fecthAchats()]);
+    } catch (error: any) {
+      console.error("Erreur upload:", error);
+      toast.error(error.response?.data?.message || "Erreur lors de l'ajout du document");
+    } finally {
+      setUploadingAchatId(null);
+      setUploadType(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Gérer le changement de quantité reçue pour un item
+  const handleQuantiteRecuChange = (itemId: number, value: string) => {
+    setBonReceptionItems(prev => 
+      prev.map(item => 
+        item.id === itemId 
+          ? { ...item, quantite_recu: value }
+          : item
+      )
+    );
+  };
+
+  // Gérer le changement de fichier pour un item
+  const handleBonReceptionFileChange = (itemId: number, file: File | null) => {
+    setBonReceptionItems(prev => 
+      prev.map(item => 
+        item.id === itemId 
+          ? { ...item, bon_reception_file: file }
+          : item
+      )
+    );
+  };
+
+  // Soumettre le bon de réception
+  const handleSubmitBonReception = async () => {
+    if (!achatForBonReception) return;
+
+    setIsSubmittingBonReception(true);
+    try {
+      const formData = new FormData();
+
+      // Ajouter chaque item
+      bonReceptionItems.forEach((item, index) => {
+        formData.append(`items[${index}][id]`, item.id.toString());
+        formData.append(`items[${index}][quantite_recu]`, parseInt(item.quantite_recu).toString());
+        
+        if (item.bon_reception_file) {
+          formData.append(`items[${index}][bon_reception]`, item.bon_reception_file);
+        }
+      });
+
+      // ✅ DEBUG : Afficher ce qui est envoyé
+      console.log("=== DONNÉES ENVOYÉES ===");
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
+
+      toast.info("Envoi du bon de réception en cours...");
+      
+      const response = await api.post(
+        `/achat/${achatForBonReception.id}/addBonReception`, 
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      toast.success(response.data.message || "Bon de réception ajouté avec succès");
+      setBonReceptionDialogOpen(false);
+      setAchatForBonReception(null);
+      setBonReceptionItems([]);
+      await Promise.all([getAchats(), fecthAchats()]);
+      
+    } catch (error: any) {
+      console.error("Erreur lors de l'ajout du bon de réception:", error);
+      console.error("Réponse du serveur:", error.response?.data);
+      
+      const errorMessage = error.response?.data?.message 
+        || error.response?.data?.error 
+        || "Erreur lors de l'ajout du bon de réception";
+      
+      toast.error(errorMessage);
+      
+      // Afficher les erreurs de validation
+      if (error.response?.data?.errors) {
+        Object.entries(error.response.data.errors).forEach(([field, messages]: [string, any]) => {
+          toast.error(`${field}: ${messages[0]}`);
+        });
+      }
+      
+      // Afficher les détails de debug si disponibles
+      if (error.response?.data?.debug) {
+        console.error("Debug info:", error.response.data.debug);
+      }
+    } finally {
+      setIsSubmittingBonReception(false);
+    }
+  };
+
   useEffect(() => {
     if (fournisseurId) {
       const fournisseurSelectionne = fournisseur.find(f => f.id === parseInt(fournisseurId));
@@ -359,7 +522,10 @@ export function AchatsSection() {
       case "commande":
         return filteredAchats.filter((a: any) => a.statut === 'commande');
       case "reception":
-        return filteredAchats.filter((a: any) => a.statut === 'reçu' || a.statut === 'partiellement_recu');
+        return filteredAchats.filter((a: any) =>
+          (a.statut === 'reçu' || a.statut === 'partiellement_recu') &&
+          (a.items && a.items.length > 0 && a.items[0].bon_reception)
+        );
       default:
         return filteredAchats;
     }
@@ -377,6 +543,13 @@ export function AchatsSection() {
 
   const renderAchatsTable = () => {
     if (activeTab === 'total') {
+      const achatItemRows = currentAchats.flatMap((achat: any) => {
+        if (achat.items && achat.items.length > 0) {
+          return achat.items.map((item: any) => ({ achat, item }));
+        }
+        return [{ achat, item: null }];
+      });
+
       return (
         <Table>
           <TableHeader>
@@ -386,17 +559,19 @@ export function AchatsSection() {
               <TableHead>Service</TableHead>
               <TableHead>Photos</TableHead>
               <TableHead>Quantité</TableHead>
+              <TableHead>Quantité Reçue</TableHead>
               <TableHead>Prix unitaire</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Statut</TableHead>
-              <TableHead>Livraison</TableHead>
+              <TableHead>Date de commande</TableHead>
+              <TableHead>Date de livraison</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentAchats.length > 0 ? (
-              currentAchats.map((a: any) => (
-                <TableRow key={a.id}>
+            {achatItemRows.length > 0 ? (
+              achatItemRows.map(({ achat: a, item }, index) => (
+                <TableRow key={`${a.id}-${item?.id ?? `no-item-${index}`}`}>
                   <TableCell>
                     <div>
                       <div className="font-medium">{a.numero_achat}</div>
@@ -407,7 +582,7 @@ export function AchatsSection() {
                   <TableCell>
                     <div>
                       <div className="font-medium">
-                        {a.items && a.items.length > 0 ? a.items[0].nom_service : 'Non défini'}
+                        {item?.nom_service ?? 'Non défini'}
                       </div>
                       <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
                     </div>
@@ -426,14 +601,19 @@ export function AchatsSection() {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell>{a.items && a.items.length > 0 ? a.items[0].quantite : "Non defini"}</TableCell>
-                  <TableCell>{a.items && a.items.length > 0 ? a.items[0].prix_unitaire : '000'} Fcfa</TableCell>
-                  <TableCell className="font-medium">{a.items && a.items.length > 0 ? a.items[0].prix_total : "000"} Fcfa</TableCell>
+                  <TableCell>{item?.quantite ?? "Non defini"}</TableCell>
+                  <TableCell>{item?.quantite_recu ?? "Non defini"}</TableCell>
+                  <TableCell>{item?.prix_unitaire ?? '000'} Fcfa</TableCell>
+                  <TableCell className="font-medium">{item?.prix_total ?? "000"} Fcfa</TableCell>
                   <TableCell>
                     <Badge variant={getStatutColor(a.statut)}>{getStatutLabel(a.statut)}</Badge>
                   </TableCell>
                   <TableCell>
-                    {a.items && a.items.length > 0 && a.items[0].date_livraison ? new Date(a.items[0].date_livraison).toLocaleDateString('fr-FR') :
+                    {item?.date_commande ? new Date(item.date_commande).toLocaleDateString('fr-FR') :
+                      <span className="text-muted-foreground">Non définie</span>}
+                  </TableCell>
+                  <TableCell>
+                    {item?.date_livraison ? new Date(item.date_livraison).toLocaleDateString('fr-FR') :
                       <span className="text-muted-foreground">Non définie</span>}
                   </TableCell>
                   <TableCell>
@@ -443,7 +623,15 @@ export function AchatsSection() {
                       </Button>
                       {userRole === "admin" && (
                         <>
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectAchat(a);
+                              setEditDialogOpen(true);
+                            }}
+                            title="Modifier"
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                           {a.statut !== 'annule' && (
@@ -486,6 +674,12 @@ export function AchatsSection() {
       const isCommandeTab = activeTab === 'commande';
       const dateHeader = isCommandeTab ? "Date Commande" : "Date Réception";
       const docHeader = isCommandeTab ? "Bon de Commande" : "Bon de Réception";
+      const achatItemRows = currentAchats.flatMap((achat: any) => {
+        if (achat.items && achat.items.length > 0) {
+          return achat.items.map((item: any) => ({ achat, item }));
+        }
+        return [{ achat, item: null }];
+      });
 
       return (
         <Table>
@@ -496,12 +690,13 @@ export function AchatsSection() {
               <TableHead>Service</TableHead>
               <TableHead>{dateHeader}</TableHead>
               <TableHead>{docHeader}</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentAchats.length > 0 ? (
-              currentAchats.map((a: any) => (
-                <TableRow key={a.id}>
+            {achatItemRows.length > 0 ? (
+              achatItemRows.map(({ achat: a, item }, index) => (
+                <TableRow key={`${a.id}-${item?.id ?? `no-item-${index}`}`}>
                   <TableCell>
                     <div>
                       <div className="font-medium">{a.numero_achat}</div>
@@ -512,16 +707,16 @@ export function AchatsSection() {
                   <TableCell>
                     <div>
                       <div className="font-medium">
-                        {a.items && a.items.length > 0 ? a.items[0].nom_service : 'Non défini'}
+                        {item?.nom_service ?? 'Non défini'}
                       </div>
                       <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
                     </div>
                   </TableCell>
                   <TableCell>
                     {isCommandeTab ? (
-                      a.items && a.items.length > 0 && a.items[0].date_commande ? new Date(a.items[0].date_commande).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
+                      item?.date_commande ? new Date(item.date_commande).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
                     ) : (
-                      a.items && a.items.length > 0 && a.items[0].date_livraison ? new Date(a.items[0].date_livraison).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
+                      item?.date_livraison ? new Date(item.date_livraison).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -529,29 +724,42 @@ export function AchatsSection() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDownloadFacture(a.id)}
                         title="Télécharger Bon de Commande"
+                        onClick={() => window.open(a?.bon_commande)}
                       >
                         <FileText className="h-4 w-4 text-primary mr-2" />
-                        <span className="text-xs">PDF</span>
+                        <span className="text-xs">Bon de commande</span>
                       </Button>
+
                     ) : (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDownloadFacture(a.id)}
+                        onClick={() => window.open(item?.bon_reception || "Aucun bon de reception")}
                         title="Télécharger Bon de Réception"
                       >
                         <FileText className="h-4 w-4 text-green-600 mr-2" />
-                        <span className="text-xs">PDF</span>
+                        <span className="text-xs">Bon de reception</span>
                       </Button>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {isCommandeTab ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFileSelect(a.id, 'commande')}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Enregistrer la réception
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-[400px]">
+                <TableCell colSpan={6} className="h-[400px]">
                   <div className="flex flex-col items-center justify-center">
                     <Package className="h-16 w-16 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold text-muted-foreground mb-2">Aucun achat disponible</h3>
@@ -637,7 +845,12 @@ export function AchatsSection() {
           </Dialog>
 
           {/* Dialog d'édition */}
-          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <Dialog open={editDialogOpen} onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) {
+              setSelectAchat(null);
+            }
+          }}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Modifier la commande</DialogTitle>
@@ -935,6 +1148,131 @@ export function AchatsSection() {
         itemName={achatToCancel?.numero_achat}
         isDeleting={isCancelling}
         confirmText="Annuler l'achat"
+      />
+
+      {/* Dialog Bon de Réception */}
+      <Dialog open={bonReceptionDialogOpen} onOpenChange={setBonReceptionDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ajouter le bon de réception</DialogTitle>
+          </DialogHeader>
+          
+          {achatForBonReception && (
+            <div className="space-y-6">
+              <div className="grid gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Commande</p>
+                  <p className="font-medium">{achatForBonReception.numero_achat}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Fournisseur</p>
+                  <p className="font-medium">{achatForBonReception.fournisseur?.nom_fournisseurs}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Articles</Label>
+                {bonReceptionItems.map((item, index) => (
+                  <Card key={item.id} className="p-4">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="font-medium">{item.nom_service}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Quantité commandée: {item.quantite}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`quantite_recu_${item.id}`}>
+                            Quantité reçue <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id={`quantite_recu_${item.id}`}
+                            type="number"
+                            min="0"
+                            max={item.quantite}
+                            value={item.quantite_recu}
+                            onChange={(e) => handleQuantiteRecuChange(item.id, e.target.value)}
+                            placeholder="0"
+                            required
+                          />
+                          {item.quantite_recu && parseInt(item.quantite_recu) > item.quantite && (
+                            <p className="text-sm text-destructive mt-1">
+                              La quantité reçue ne peut pas dépasser {item.quantite}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`bon_reception_${item.id}`}>
+                            Bon de réception (PDF)
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id={`bon_reception_${item.id}`}
+                              type="file"
+                              accept="application/pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                handleBonReceptionFileChange(item.id, file);
+                              }}
+                              className="cursor-pointer"
+                            />
+                            {item.bon_reception_file && (
+                              <span className="text-sm text-muted-foreground">
+                                {item.bon_reception_file.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setBonReceptionDialogOpen(false);
+                    setAchatForBonReception(null);
+                    setBonReceptionItems([]);
+                  }}
+                  disabled={isSubmittingBonReception}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  onClick={handleSubmitBonReception}
+                  disabled={isSubmittingBonReception}
+                >
+                  {isSubmittingBonReception ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Envoi en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Enregistrer
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="application/pdf"
+        onChange={handleFileChange}
       />
     </div>
   );
