@@ -177,7 +177,7 @@ export default function FormVente({
                                                 <SelectContent>
                                                     {stock.map((s: any) => (
                                                         <SelectItem key={s.id} value={s.id.toString()}>
-                                                            {s.achat?.nom_service} ({s.quantite} disponible)
+                                                            {s.achat.items?.[0]?.nom_service || 'Service non défini'} ({s.quantite} disponible)
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
