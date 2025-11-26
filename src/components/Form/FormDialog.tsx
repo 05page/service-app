@@ -13,8 +13,10 @@ type Props = {
   setAchat: (value: string) => void;
   categorie: string;
   setCategorie: (value: string) => void;
+  quantite?: string; // Quantité initiale pour l'édition
   quantiMin: string;
   setQuantiteMin: (value: string) => void;
+  prixAchat?: string; // Prix d'achat pour l'édition
   prixVente: string;
   setPrixVente: (value: string) => void;
   description: string;
@@ -37,8 +39,10 @@ export default function FormDialog({
   setAchat,
   categorie,
   setCategorie,
+  quantite,
   quantiMin,
   setQuantiteMin,
+  prixAchat,
   prixVente,
   setPrixVente,
   description,
@@ -115,12 +119,12 @@ export default function FormDialog({
           <Input
             id="quantite"
             type="number"
-            value={achatSelectionne?.quantite || ""}
+            value={isEdit ? (quantite || "") : (achatSelectionne?.quantite || "")}
             placeholder="Quantité récupérée de l'achat"
             disabled
           />
           <p className="text-xs text-muted-foreground">
-            Cette quantité sera automatiquement remplie selon l'achat sélectionné
+            {isEdit ? "Quantité initiale du stock" : "Cette quantité sera automatiquement remplie selon l'achat sélectionné"}
           </p>
         </div>
 
@@ -144,7 +148,7 @@ export default function FormDialog({
           <Input
             id="prixAchat"
             type="number"
-            value={achatSelectionne?.prix_unitaire || ""}
+            value={isEdit ? (prixAchat || "") : (achatSelectionne?.prix_unitaire || "")}
             placeholder="Prix d'achat automatique"
             disabled
           />

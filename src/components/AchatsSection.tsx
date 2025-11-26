@@ -307,13 +307,15 @@ export function AchatsSection() {
       if (selectedAchat && selectedAchat.items) {
         setAchatForBonReception(selectedAchat);
         // Initialiser les items avec les données existantes
-        const itemsData = selectedAchat.items.map((item: any) => ({
-          id: item.id,
-          nom_service: item.nom_service || '',
-          quantite: item.quantite || 0,
-          quantite_recu: item.quantite_recu?.toString() || '',
-          bon_reception_file: null as File | null
-        }));
+        const itemsData = selectedAchat.items
+          .filter((item: any) => !item.bon_reception || item.bon_reception === null || item.bon_reception === undefined)
+          .map((item: any) => ({
+            id: item.id,
+            nom_service: item.nom_service || '',
+            quantite: item.quantite || 0,
+            quantite_recu: item.quantite_recu?.toString() || '',
+            bon_reception_file: null as File | null
+          }));
         setBonReceptionItems(itemsData);
         setBonReceptionDialogOpen(true);
       }
@@ -465,23 +467,23 @@ export function AchatsSection() {
     setPrixTotal((q * pU).toFixed(2))
   }, [quantite, prixUnitaire])
 
-  const getStatutColor = (statut: string) => {
-    switch (statut) {
+  const getStatutColor = (statut_item: string) => {
+    switch (statut_item) {
       case "commande": return "secondary";
-      case "paye": return "default";
-      case "reçu": return "default";
+      case "partiellement_recu": return "default";
+      case "recu": return "default";
       case "annule": return "destructive";
       default: return "secondary";
     }
   };
 
-  const getStatutLabel = (statut: string) => {
-    switch (statut) {
+  const getStatutLabel = (statut_item: string) => {
+    switch (statut_item) {
       case "commande": return "Commande";
       case "partiellement_recu": return "Partiellement Reçu";
-      case "reçu": return "Reçu";
+      case "recu": return "Reçu";
       case "annule": return "Annulé";
-      default: return statut;
+      default: return statut_item;
     }
   };
 
@@ -516,16 +518,23 @@ export function AchatsSection() {
     }
     return matchSearch && matchStatut && matchPeriode;
   });
- 
+
   const getTabFilteredData = () => {
     switch (activeTab) {
       case "commande":
-        return filteredAchats.filter((a: any) => a.statut === 'commande');
-      case "reception":
         return filteredAchats.filter((a: any) =>
-          (a.statut === 'reçu' || a.statut === 'partiellement_recu') &&
-          (a.items && a.items.length > 0 && a.items[0].bon_reception)
+          a.statut === 'commande' || a.statut === 'partiellement_recu'
         );
+      case "reception":
+        // Filtrer les achats qui ont au moins un item avec statut_item reçu ou partiellement_recu ET bon_reception non null
+        return filteredAchats.filter((a: any) => {
+          if (!a.items || a.items.length === 0) return false;
+          return a.items.some((item: any) =>
+            (item.statut_item === 'recu' || item.statut_item === 'partiellement_recu') &&
+            item.bon_reception !== null &&
+            item.bon_reception !== undefined
+          );
+        });
       default:
         return filteredAchats;
     }
@@ -612,7 +621,7 @@ export function AchatsSection() {
                   <TableCell className="font-medium">{item?.prix_total ?? "000"} Fcfa</TableCell>
                   <TableCell className="font-medium">{item?.prix_reel ?? "000"} Fcfa</TableCell>
                   <TableCell>
-                    <Badge variant={getStatutColor(a.statut)}>{getStatutLabel(a.statut)}</Badge>
+                    <Badge variant={getStatutColor(item.statut_item)}>{getStatutLabel(item.statut_item)}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
@@ -672,12 +681,19 @@ export function AchatsSection() {
       const isCommandeTab = activeTab === 'commande';
       const dateHeader = isCommandeTab ? "Date Commande" : "Date Réception";
       const docHeader = isCommandeTab ? "Bon de Commande" : "Bon de Réception";
-      const achatItemRows = currentAchats.flatMap((achat: any) => {
-        if (achat.items && achat.items.length > 0) {
-          return achat.items.map((item: any) => ({ achat, item }));
-        }
-        return [{ achat, item: null }];
-      });
+      // Pour l'onglet "Bon de Commande", afficher par achat (un seul par achat)
+      // Pour l'onglet "Bon de Réception", afficher par items avec bon_reception non null
+      const achatItemRows = isCommandeTab
+        ? currentAchats.map((achat: any) => ({ achat, item: null }))
+        : currentAchats.flatMap((achat: any) => {
+          if (achat.items && achat.items.length > 0) {
+            // Filtrer uniquement les items avec bon_reception non null
+            return achat.items
+              .filter((item: any) => item.bon_reception !== null && item.bon_reception !== undefined)
+              .map((item: any) => ({ achat, item }));
+          }
+          return [];
+        });
 
       return (
         <Table>
@@ -705,13 +721,20 @@ export function AchatsSection() {
                   <TableCell>
                     <div>
                       <div className="font-medium">
-                        {item?.nom_service ?? 'Non défini'}
+                        {isCommandeTab
+                          ? (a.items && a.items.length > 0
+                            ? `${a.items.length} service${a.items.length > 1 ? 's' : ''}`
+                            : 'Non défini')
+                          : (item?.nom_service ?? 'Non défini')
+                        }
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     {isCommandeTab ? (
-                      item?.date_commande ? new Date(item.date_commande).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
+                      a.items && a.items.length > 0 && a.items[0]?.date_commande
+                        ? new Date(a.items[0].date_commande).toLocaleDateString('fr-FR')
+                        : <span className="text-muted-foreground">Non définie</span>
                     ) : (
                       item?.date_livraison ? new Date(item.date_livraison).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
                     )}
@@ -732,7 +755,7 @@ export function AchatsSection() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(a?.bon_reception || "Aucun bon de reception")}
+                        onClick={() => window.open(item?.bon_reception || "Aucun bon de reception")}
                         title="Télécharger Bon de Réception"
                       >
                         <FileText className="h-4 w-4 text-green-600 mr-2" />
@@ -1060,8 +1083,8 @@ export function AchatsSection() {
                                     key={photo.id}
                                     onClick={() => setCurrentPhotoIndex(photoIndex)}
                                     className={`relative h-16 w-16 flex-shrink-0 rounded overflow-hidden border-2 transition-all ${currentPhotoIndex === photoIndex
-                                        ? 'border-primary ring-2 ring-primary'
-                                        : 'border-transparent hover:border-muted-foreground'
+                                      ? 'border-primary ring-2 ring-primary'
+                                      : 'border-transparent hover:border-muted-foreground'
                                       }`}
                                   >
                                     <img

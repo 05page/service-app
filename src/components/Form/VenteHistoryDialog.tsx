@@ -115,7 +115,7 @@ export function VenteHistoryDialog({ open, onOpenChange, vente, historique }: Ve
                     {vente.items.map((item: any, index: number) => (
                       <div key={index} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                         <div>
-                          <p className="font-medium">{item.nom_article || 'Article'}</p>
+                          <p className="font-medium">{item.nom_produit || 'Article'}</p>
                           <p className="text-sm text-muted-foreground">
                             Quantité: {item.quantite} × {formatCurrency(item.prix_unitaire)} Fcfa
                           </p>
@@ -148,7 +148,7 @@ export function VenteHistoryDialog({ open, onOpenChange, vente, historique }: Ve
                               <Clock className="h-3 w-3" />
                               {formatDate(paiement.date_paiement)}
                             </p>
-                          </div>
+                          </div>  
                         </div>
                         {paiement.commentaire && (
                           <p className="text-sm text-muted-foreground mt-1">{paiement.commentaire}</p>

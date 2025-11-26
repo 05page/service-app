@@ -346,7 +346,7 @@ export function ClientsSection() {
                                 {vente.items.map((item: any, index: number) => (
                                   <div key={index} className="flex justify-between text-sm">
                                     <span className="flex-1">
-                                      {item.stock?.achat?.nom_service || 'Article'}
+                                      {item.nom_produit ||"Article"}
                                     </span>
                                     <span className="text-muted-foreground mx-2">
                                       {item.quantite} × {parseFloat(item.prix_unitaire || 0).toLocaleString('fr-FR')} Fcfa
