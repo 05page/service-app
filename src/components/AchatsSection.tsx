@@ -357,9 +357,9 @@ export function AchatsSection() {
 
   // Gérer le changement de quantité reçue pour un item
   const handleQuantiteRecuChange = (itemId: number, value: string) => {
-    setBonReceptionItems(prev => 
-      prev.map(item => 
-        item.id === itemId 
+    setBonReceptionItems(prev =>
+      prev.map(item =>
+        item.id === itemId
           ? { ...item, quantite_recu: value }
           : item
       )
@@ -368,9 +368,9 @@ export function AchatsSection() {
 
   // Gérer le changement de fichier pour un item
   const handleBonReceptionFileChange = (itemId: number, file: File | null) => {
-    setBonReceptionItems(prev => 
-      prev.map(item => 
-        item.id === itemId 
+    setBonReceptionItems(prev =>
+      prev.map(item =>
+        item.id === itemId
           ? { ...item, bon_reception_file: file }
           : item
       )
@@ -389,7 +389,7 @@ export function AchatsSection() {
       bonReceptionItems.forEach((item, index) => {
         formData.append(`items[${index}][id]`, item.id.toString());
         formData.append(`items[${index}][quantite_recu]`, parseInt(item.quantite_recu).toString());
-        
+
         if (item.bon_reception_file) {
           formData.append(`items[${index}][bon_reception]`, item.bon_reception_file);
         }
@@ -402,9 +402,9 @@ export function AchatsSection() {
       }
 
       toast.info("Envoi du bon de réception en cours...");
-      
+
       const response = await api.post(
-        `/achat/${achatForBonReception.id}/addBonReception`, 
+        `/achat/${achatForBonReception.id}/addBonReception`,
         formData,
         {
           headers: {
@@ -418,24 +418,24 @@ export function AchatsSection() {
       setAchatForBonReception(null);
       setBonReceptionItems([]);
       await Promise.all([getAchats(), fecthAchats()]);
-      
+
     } catch (error: any) {
       console.error("Erreur lors de l'ajout du bon de réception:", error);
       console.error("Réponse du serveur:", error.response?.data);
-      
-      const errorMessage = error.response?.data?.message 
-        || error.response?.data?.error 
+
+      const errorMessage = error.response?.data?.message
+        || error.response?.data?.error
         || "Erreur lors de l'ajout du bon de réception";
-      
+
       toast.error(errorMessage);
-      
+
       // Afficher les erreurs de validation
       if (error.response?.data?.errors) {
         Object.entries(error.response.data.errors).forEach(([field, messages]: [string, any]) => {
           toast.error(`${field}: ${messages[0]}`);
         });
       }
-      
+
       // Afficher les détails de debug si disponibles
       if (error.response?.data?.debug) {
         console.error("Debug info:", error.response.data.debug);
@@ -516,7 +516,7 @@ export function AchatsSection() {
     }
     return matchSearch && matchStatut && matchPeriode;
   });
-
+ 
   const getTabFilteredData = () => {
     switch (activeTab) {
       case "commande":
@@ -561,10 +561,9 @@ export function AchatsSection() {
               <TableHead>Quantité</TableHead>
               <TableHead>Quantité Reçue</TableHead>
               <TableHead>Prix unitaire</TableHead>
-              <TableHead>Total</TableHead>
+              <TableHead>Prix Total</TableHead>
+              <TableHead>Prix reel</TableHead>
               <TableHead>Statut</TableHead>
-              <TableHead>Date de commande</TableHead>
-              <TableHead>Date de livraison</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -588,11 +587,17 @@ export function AchatsSection() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {a.photos && a.photos.length > 0 ? (
+                    {item.photos && item.photos.length > 0 ? (
                       <div className="flex items-center gap-1">
-                        <img src={a.photos[0].path} alt='produit' className='h-10 w-10 object-cover rounded' />
-                        {a.photos.length > 1 && (
-                          <span className="text-xs text-muted-foreground">+{a.photos.length - 1}</span>
+                        <img
+                          src={item.photos[0].path}
+                          alt={item.nom_service}
+                          className='h-10 w-10 object-cover rounded border'
+                        />
+                        {item.photos.length > 1 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{item.photos.length - 1}
+                          </span>
                         )}
                       </div>
                     ) : (
@@ -605,16 +610,9 @@ export function AchatsSection() {
                   <TableCell>{item?.quantite_recu ?? "Non defini"}</TableCell>
                   <TableCell>{item?.prix_unitaire ?? '000'} Fcfa</TableCell>
                   <TableCell className="font-medium">{item?.prix_total ?? "000"} Fcfa</TableCell>
+                  <TableCell className="font-medium">{item?.prix_reel ?? "000"} Fcfa</TableCell>
                   <TableCell>
                     <Badge variant={getStatutColor(a.statut)}>{getStatutLabel(a.statut)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {item?.date_commande ? new Date(item.date_commande).toLocaleDateString('fr-FR') :
-                      <span className="text-muted-foreground">Non définie</span>}
-                  </TableCell>
-                  <TableCell>
-                    {item?.date_livraison ? new Date(item.date_livraison).toLocaleDateString('fr-FR') :
-                      <span className="text-muted-foreground">Non définie</span>}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
@@ -623,8 +621,8 @@ export function AchatsSection() {
                       </Button>
                       {userRole === "admin" && (
                         <>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => {
                               setSelectAchat(a);
@@ -709,7 +707,6 @@ export function AchatsSection() {
                       <div className="font-medium">
                         {item?.nom_service ?? 'Non défini'}
                       </div>
-                      <div className="text-sm text-muted-foreground max-w-xs truncate">{a.description}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -735,7 +732,7 @@ export function AchatsSection() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(item?.bon_reception || "Aucun bon de reception")}
+                        onClick={() => window.open(a?.bon_reception || "Aucun bon de reception")}
                         title="Télécharger Bon de Réception"
                       >
                         <FileText className="h-4 w-4 text-green-600 mr-2" />
@@ -999,132 +996,155 @@ export function AchatsSection() {
 
       {/* Dialog Détails avec Galerie */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Détails de l'achat {detail?.numero_achat}</DialogTitle>
           </DialogHeader>
           {detail && (
             <div className="grid gap-6">
-              {/* Galerie de photos */}
-              <div className="flex gap-6">
-                <div className="flex-shrink-0">
-                  {detail.photos && detail.photos.length > 0 ? (
-                    <div className="relative">
-                      <img
-                        src={detail.photos[currentPhotoIndex]?.path}
-                        alt="Produit"
-                        className="h-64 w-64 object-cover rounded-lg"
-                      />
+              {/* Informations générales */}
+              <div className="grid gap-3 p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">Fournisseur</p>
+                  <p className="font-medium">{detail.fournisseur?.nom_fournisseurs}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Description générale</p>
+                  <p className="text-sm">{detail.description || 'Aucune description'}</p>
+                </div>
+              </div>
 
-                      {/* Navigation photos */}
-                      {detail.photos.length > 1 && (
-                        <>
-                          <button
-                            onClick={prevPhoto}
-                            disabled={currentPhotoIndex === 0}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/70 transition-all"
-                          >
-                            <ChevronLeft className="h-5 w-5" />
-                          </button>
+              {/* Liste des items avec leurs photos */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Articles commandés ({detail.items?.length || 0})</h3>
 
-                          <button
-                            onClick={nextPhoto}
-                            disabled={currentPhotoIndex === detail.photos.length - 1}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/70 transition-all"
-                          >
-                            <ChevronRight className="h-5 w-5" />
-                          </button>
-                        </>
-                      )}
+                {detail.items && detail.items.map((item: any, idx: number) => (
+                  <Card key={item.id} className="p-4">
+                    <div className="flex gap-6">
+                      {/* Galerie de photos de l'item */}
+                      <div className="flex-shrink-0">
+                        {item.photos && item.photos.length > 0 ? (
+                          <div className="relative">
+                            <img
+                              src={item.photos[currentPhotoIndex]?.path || item.photos[0].path}
+                              alt={item.nom_service}
+                              className="h-64 w-64 object-cover rounded-lg border-2 border-border"
+                            />
 
-                      {/* Miniatures */}
-                      {detail.photos.length > 1 && (
-                        <div className="flex gap-2 mt-2">
-                          {detail.photos.map((photo: any, index: number) => (
-                            <button
-                              key={index}
-                              onClick={() => setCurrentPhotoIndex(index)}
-                              className={`relative h-16 w-16 rounded overflow-hidden border-2 transition-all ${currentPhotoIndex === index
-                                ? 'border-primary ring-2 ring-primary'
-                                : 'border-transparent hover:border-muted-foreground'
-                                }`}
-                            >
-                              <img
-                                src={photo.path}
-                                alt={`Miniature ${index + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            </button>
-                          ))}
+                            {/* Navigation photos - seulement si plus d'une photo */}
+                            {item.photos.length > 1 && (
+                              <>
+                                <button
+                                  onClick={() => setCurrentPhotoIndex(Math.max(0, currentPhotoIndex - 1))}
+                                  disabled={currentPhotoIndex === 0}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/70 transition-all"
+                                >
+                                  <ChevronLeft className="h-5 w-5" />
+                                </button>
+
+                                <button
+                                  onClick={() => setCurrentPhotoIndex(Math.min(item.photos.length - 1, currentPhotoIndex + 1))}
+                                  disabled={currentPhotoIndex >= item.photos.length - 1}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/70 transition-all"
+                                >
+                                  <ChevronRight className="h-5 w-5" />
+                                </button>
+                              </>
+                            )}
+
+                            {/* Miniatures */}
+                            {item.photos.length > 1 && (
+                              <div className="flex gap-2 mt-2 overflow-x-auto">
+                                {item.photos.map((photo: any, photoIndex: number) => (
+                                  <button
+                                    key={photo.id}
+                                    onClick={() => setCurrentPhotoIndex(photoIndex)}
+                                    className={`relative h-16 w-16 flex-shrink-0 rounded overflow-hidden border-2 transition-all ${currentPhotoIndex === photoIndex
+                                        ? 'border-primary ring-2 ring-primary'
+                                        : 'border-transparent hover:border-muted-foreground'
+                                      }`}
+                                  >
+                                    <img
+                                      src={photo.path}
+                                      alt={`Miniature ${photoIndex + 1}`}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Indicateur de photos */}
+                            <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
+                              {currentPhotoIndex + 1} / {item.photos.length}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="h-64 w-64 bg-muted rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/20">
+                            <ImageIcon className="h-16 w-16 text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Aucune photo</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Détails de l'item */}
+                      <div className="flex-1 grid gap-3">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Service</p>
+                          <p className="font-semibold text-lg">{item.nom_service}</p>
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-64 w-64 bg-muted rounded-lg flex items-center justify-center">
-                      <ImageIcon className="h-16 w-16 text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
 
-                <div className="flex-1 grid gap-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Fournisseur</p>
-                    <p className="font-medium">{detail.fournisseur?.nom_fournisseurs}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Service</p>
-                    <p className="font-medium">{detail.items && detail.items.length > 0 ? detail.items[0].nom_service : 'Non défini'}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Quantité</p>
-                      <p className="font-medium">{detail.items && detail.items.length > 0 ? detail.items[0].quantite : 'Non défini'}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Quantité</p>
+                            <p className="font-medium">{item.quantite}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Prix unitaire</p>
+                            <p className="font-medium">{parseFloat(item.prix_unitaire).toLocaleString('fr-FR')} Fcfa</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-muted-foreground">Prix total</p>
+                          <p className="text-2xl font-bold text-green-600">{parseFloat(item.prix_reel).toLocaleString('fr-FR')} Fcfa</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Date de commande</p>
+                            <p className="font-medium">
+                              {item.date_commande
+                                ? new Date(item.date_commande).toLocaleDateString('fr-FR')
+                                : "Non définie"
+                              }
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Date de livraison</p>
+                            <p className="font-medium">
+                              {item.date_livraison
+                                ? new Date(item.date_livraison).toLocaleDateString('fr-FR')
+                                : "Non définie"
+                              }
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-muted-foreground">Statut</p>
+                          <Badge variant={item.statut_item === 'recu' ? 'default' : 'secondary'}>
+                            {item.statut_item === 'recu' ? 'Reçu' :
+                              item.statut_item === 'en_attente' ? 'En attente' :
+                                item.statut_item === 'partiellement_recu' ? 'Partiellement reçu' :
+                                  item.statut_item}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Prix unitaire</p>
-                      <p className="font-medium">{detail.items && detail.items.length > 0 ? detail.items[0].prix_unitaire?.toLocaleString() : 'Non défini'} Fcfa</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Prix total</p>
-                    <p className="text-2xl font-bold">{detail.items && detail.items.length > 0 ? detail.items[0].prix_total?.toLocaleString() : 'Non défini'} Fcfa</p>
-                  </div>
-                </div>
+                  </Card>
+                ))}
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Date de commande</p>
-                  <p className="font-medium">
-                    {detail.items && detail.items.length > 0 && detail.items[0].date_commande
-                      ? new Date(detail.items[0].date_commande).toLocaleDateString('fr-FR')
-                      : "Non définie"
-                    }
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Date de livraison</p>
-                  <p className="font-medium">
-                    {detail.items && detail.items.length > 0 && detail.items[0].date_livraison
-                      ? new Date(detail.items[0].date_livraison).toLocaleDateString('fr-FR')
-                      : "Non définie"
-                    }
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Statut</p>
-                  <Badge variant={getStatutColor(detail.statut)}>
-                    {getStatutLabel(detail.statut)}
-                  </Badge>
-                </div>
-              </div>
-
-              {detail.description && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Description</p>
-                  <p className="text-sm">{detail.description}</p>
-                </div>
-              )}
 
               {/* Bouton télécharger facture */}
               <div className="flex justify-end pt-4 border-t">
@@ -1156,7 +1176,7 @@ export function AchatsSection() {
           <DialogHeader>
             <DialogTitle>Ajouter le bon de réception</DialogTitle>
           </DialogHeader>
-          
+
           {achatForBonReception && (
             <div className="space-y-6">
               <div className="grid gap-4">
