@@ -21,6 +21,13 @@ const Auth = () => {
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
+  const getToken = localStorage.getItem('token')
+  useEffect(() => {
+    if (getToken) {
+      navigate('/dashboard')
+    }
+  }, [getToken])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !role) {
@@ -119,9 +126,9 @@ const Auth = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="role">Rôle</Label>
-                <Select 
-                  value={role} 
-                  onValueChange={(value) => setRole(value as UserRole)} 
+                <Select
+                  value={role}
+                  onValueChange={(value) => setRole(value as UserRole)}
                   required
                   disabled={loading}
                 >

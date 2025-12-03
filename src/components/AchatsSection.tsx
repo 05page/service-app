@@ -104,6 +104,8 @@ export function AchatsSection() {
     nom_service: string;
     quantite: number;
     quantite_recu: string;
+    numero_bon_reception: string;
+    date_reception: string
     bon_reception_file: File | null;
   }>>([]);
   const [isSubmittingBonReception, setIsSubmittingBonReception] = useState(false);
@@ -271,6 +273,39 @@ export function AchatsSection() {
     }
   }
 
+  const handleDownloadBonReception = async (achatItemId: string) => {
+    try {
+      toast.info('Génération du bon de réception en cours...');
+      const response = await api.get(`factures/bonReception/${achatItemId}/pdf`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      //permet de generer un url temporaire pour le blob
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Bon-reception-${achatItemId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Bon de réception téléchargé avec succès");
+    } catch (error: any) {
+      if (error.response?.data instanceof Blob) {
+        const text = await error.response.data.text();
+        try {
+          const errorData = JSON.parse(text);
+          toast.error(errorData.message || "Erreur lors de la génération du bon de réception");
+        } catch {
+          toast.error("Erreur lors de la génération du bon de réception");
+        }
+      } else {
+        toast.error(error.response?.data?.message || "Erreur lors du téléchargement du bin de réception");
+      }
+    }
+  }
+
   const openDetailDialog = (achat: any) => {
     setDetail(achat);
     setCurrentPhotoIndex(0);
@@ -308,13 +343,19 @@ export function AchatsSection() {
         setAchatForBonReception(selectedAchat);
         // Initialiser les items avec les données existantes
         const itemsData = selectedAchat.items
-          .filter((item: any) => !item.bon_reception || item.bon_reception === null || item.bon_reception === undefined)
+          // Filtrer les articles déjà reçus (ceux qui ont un numero_bon_reception)
+          .filter((item: any) => {
+            const hasNumeroBon = item.numero_bon_reception && 
+                                 item.numero_bon_reception.toString().trim() !== '';
+            return !hasNumeroBon;
+          })
           .map((item: any) => ({
             id: item.id,
             nom_service: item.nom_service || '',
             quantite: item.quantite || 0,
             quantite_recu: item.quantite_recu?.toString() || '',
-            bon_reception_file: null as File | null
+            numero_bon_reception: item.numero_bon_reception || '',
+            date_reception: item.date_reception || ""
           }));
         setBonReceptionItems(itemsData);
         setBonReceptionDialogOpen(true);
@@ -368,12 +409,21 @@ export function AchatsSection() {
     );
   };
 
-  // Gérer le changement de fichier pour un item
-  const handleBonReceptionFileChange = (itemId: number, file: File | null) => {
+  const handleNumeroBonReceptionChange = (itemId: number, value: string) => {
     setBonReceptionItems(prev =>
       prev.map(item =>
         item.id === itemId
-          ? { ...item, bon_reception_file: file }
+          ? { ...item, numero_bon_reception: value }
+          : item
+      )
+    );
+  };
+  // Gérer le changement de la date de réception
+  const handleDateReceptionChange = (itemId: number, value: string) => {
+    setBonReceptionItems(prev =>
+      prev.map(item =>
+        item.id === itemId
+          ? { ...item, date_reception: value }
           : item
       )
     );
@@ -383,21 +433,46 @@ export function AchatsSection() {
   const handleSubmitBonReception = async () => {
     if (!achatForBonReception) return;
 
+    const itemsSubmit = bonReceptionItems.filter(item => {
+      const hasQuantite = item.quantite_recu && parseInt(item.quantite_recu) > 0;
+      const hasNumero = item.numero_bon_reception && item.numero_bon_reception.trim() !== '';
+      const hasDate = item.date_reception && item.date_reception.trim() !== '';
+
+      return hasQuantite && hasNumero && hasDate;
+    });
+
+    if (itemsSubmit.length === 0) {
+      toast.error('Veuillez remplir au moins un article avec tous les champs requis');
+      return;
+    }
+
+    const errors: string[] = [];
+    itemsSubmit.forEach((item, index) => {
+      if (parseInt(item.quantite_recu) > item.quantite) {
+        errors.push(
+          `${item.nom_service}: La quantité reçue (${item.quantite_recu}) dépasse la quantité commandée (${item.quantite})`
+        );
+      }
+    });
+
+    if (errors.length > 0) {
+      errors.forEach(error => toast.error(error));
+      return;
+    }
+
     setIsSubmittingBonReception(true);
     try {
       const formData = new FormData();
 
       // Ajouter chaque item
-      bonReceptionItems.forEach((item, index) => {
+      itemsSubmit.forEach((item, index) => {
         formData.append(`items[${index}][id]`, item.id.toString());
         formData.append(`items[${index}][quantite_recu]`, parseInt(item.quantite_recu).toString());
-
-        if (item.bon_reception_file) {
-          formData.append(`items[${index}][bon_reception]`, item.bon_reception_file);
-        }
+        formData.append(`items[${index}][numero_bon_reception]`, item.numero_bon_reception);  // ✅ Pas de parseInt
+        formData.append(`items[${index}][date_reception]`, item.date_reception);  // ✅ Pas de parseInt
       });
 
-      // ✅ DEBUG : Afficher ce qui est envoyé
+      //DEBUG : Afficher ce qui est envoyé
       console.log("=== DONNÉES ENVOYÉES ===");
       for (let [key, value] of formData.entries()) {
         console.log(`${key}:`, value);
@@ -423,12 +498,8 @@ export function AchatsSection() {
 
     } catch (error: any) {
       console.error("Erreur lors de l'ajout du bon de réception:", error);
-      console.error("Réponse du serveur:", error.response?.data);
 
       const errorMessage = error.response?.data?.message
-        || error.response?.data?.error
-        || "Erreur lors de l'ajout du bon de réception";
-
       toast.error(errorMessage);
 
       // Afficher les erreurs de validation
@@ -531,8 +602,8 @@ export function AchatsSection() {
           if (!a.items || a.items.length === 0) return false;
           return a.items.some((item: any) =>
             (item.statut_item === 'recu' || item.statut_item === 'partiellement_recu') &&
-            item.bon_reception !== null &&
-            item.bon_reception !== undefined
+            item.numero_bon_reception !== null &&
+            item.numero_bon_reception !== undefined
           );
         });
       default:
@@ -677,10 +748,8 @@ export function AchatsSection() {
         </Table>
       );
     } else {
-      // Columns for 'commande' and 'reception' tabs
       const isCommandeTab = activeTab === 'commande';
       const dateHeader = isCommandeTab ? "Date Commande" : "Date Réception";
-      const docHeader = isCommandeTab ? "Bon de Commande" : "Bon de Réception";
       // Pour l'onglet "Bon de Commande", afficher par achat (un seul par achat)
       // Pour l'onglet "Bon de Réception", afficher par items avec bon_reception non null
       const achatItemRows = isCommandeTab
@@ -689,7 +758,7 @@ export function AchatsSection() {
           if (achat.items && achat.items.length > 0) {
             // Filtrer uniquement les items avec bon_reception non null
             return achat.items
-              .filter((item: any) => item.bon_reception !== null && item.bon_reception !== undefined)
+              .filter((item: any) => item.numero_bon_reception !== null && item.numero_bon_reception !== undefined)
               .map((item: any) => ({ achat, item }));
           }
           return [];
@@ -703,7 +772,8 @@ export function AchatsSection() {
               <TableHead>Fournisseur</TableHead>
               <TableHead>Service</TableHead>
               <TableHead>{dateHeader}</TableHead>
-              <TableHead>{docHeader}</TableHead>
+              {isCommandeTab && <TableHead>Bon de commande</TableHead>}
+              {!isCommandeTab && <TableHead>Numéro BR</TableHead>}
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -736,11 +806,12 @@ export function AchatsSection() {
                         ? new Date(a.items[0].date_commande).toLocaleDateString('fr-FR')
                         : <span className="text-muted-foreground">Non définie</span>
                     ) : (
-                      item?.date_livraison ? new Date(item.date_livraison).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
+                      item?.date_reception ? new Date(item.date_reception).toLocaleDateString('fr-FR') : <span className="text-muted-foreground">Non définie</span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {isCommandeTab ? (
+                  {/* ✅ Colonne conditionnelle : Bon de commande OU Numéro BR */}
+                  {isCommandeTab && (
+                    <TableCell>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -750,19 +821,14 @@ export function AchatsSection() {
                         <FileText className="h-4 w-4 text-primary mr-2" />
                         <span className="text-xs">Bon de commande</span>
                       </Button>
+                    </TableCell>
+                  )}
 
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(item?.bon_reception || "Aucun bon de reception")}
-                        title="Télécharger Bon de Réception"
-                      >
-                        <FileText className="h-4 w-4 text-green-600 mr-2" />
-                        <span className="text-xs">Bon de reception</span>
-                      </Button>
-                    )}
-                  </TableCell>
+                  {!isCommandeTab && (
+                    <TableCell>
+                      <span className="font-mono text-sm">{item?.numero_bon_reception || '-'}</span>
+                    </TableCell>
+                  )}
                   <TableCell>
                     {isCommandeTab ? (
                       <Button
@@ -773,7 +839,16 @@ export function AchatsSection() {
                         <Upload className="h-4 w-4 mr-2" />
                         Enregistrer la réception
                       </Button>
-                    ) : null}
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadBonReception(item.id)}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Telecharger le bon de reception
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -1214,65 +1289,96 @@ export function AchatsSection() {
               </div>
 
               <div className="space-y-4">
-                <Label className="text-base font-semibold">Articles</Label>
-                {bonReceptionItems.map((item, index) => (
-                  <Card key={item.id} className="p-4">
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="font-medium">{item.nom_service}</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Quantité commandée: {item.quantite}
-                        </p>
-                      </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Articles</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Remplissez les articles que vous souhaitez réceptionner
+                  </p>
+                </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor={`quantite_recu_${item.id}`}>
-                            Quantité reçue <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            id={`quantite_recu_${item.id}`}
-                            type="number"
-                            min="0"
-                            max={item.quantite}
-                            value={item.quantite_recu}
-                            onChange={(e) => handleQuantiteRecuChange(item.id, e.target.value)}
-                            placeholder="0"
-                            required
-                          />
-                          {item.quantite_recu && parseInt(item.quantite_recu) > item.quantite && (
-                            <p className="text-sm text-destructive mt-1">
-                              La quantité reçue ne peut pas dépasser {item.quantite}
+                {bonReceptionItems.map((item, index) => {
+                  // ✅ Calculer si l'item est complet
+                  const isItemComplete =
+                    item.quantite_recu &&
+                    parseInt(item.quantite_recu) > 0 &&
+                    item.numero_bon_reception?.trim() &&
+                    item.date_reception;
+
+                  return (
+                    <Card
+                      key={item.id}
+                      className={`p-4 ${isItemComplete ? 'border-green-500' : ''}`}
+                    >
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="font-medium">{item.nom_service}</Label>
+                            <p className="text-sm text-muted-foreground">
+                              Quantité commandée: {item.quantite}
                             </p>
+                          </div>
+                          {isItemComplete && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              ✓ Complet
+                            </Badge>
                           )}
                         </div>
 
-                        <div>
-                          <Label htmlFor={`bon_reception_${item.id}`}>
-                            Bon de réception (PDF)
-                          </Label>
-                          <div className="flex items-center gap-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor={`quantite_recu_${item.id}`}>
+                              Quantité reçue *
+                            </Label>
                             <Input
-                              id={`bon_reception_${item.id}`}
-                              type="file"
-                              accept="application/pdf"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0] || null;
-                                handleBonReceptionFileChange(item.id, file);
-                              }}
-                              className="cursor-pointer"
+                              id={`quantite_recu_${item.id}`}
+                              type="number" required
+                              min="0"
+                              max={item.quantite}
+                              value={item.quantite_recu}
+                              onChange={(e) => handleQuantiteRecuChange(item.id, e.target.value)}
+                              placeholder="0"
                             />
-                            {item.bon_reception_file && (
-                              <span className="text-sm text-muted-foreground">
-                                {item.bon_reception_file.name}
-                              </span>
+                            {item.quantite_recu && parseInt(item.quantite_recu) > item.quantite && (
+                              <p className="text-sm text-destructive mt-1">
+                                Max: {item.quantite}
+                              </p>
                             )}
+                          </div>
+
+                          <div>
+                            <Label>Numéro bon de réception *</Label>
+                            <Input
+                              type="text" required
+                              maxLength={25}
+                              value={item.numero_bon_reception}
+                              onChange={(e) => handleNumeroBonReceptionChange(item.id, e.target.value)}
+                              placeholder="Ex: BR-2025-001"
+                            />
+                          </div>
+
+                          <div>
+                            <Label>Date de réception *</Label>
+                            <Input
+                              type="date"
+                              value={item.date_reception} required
+                              onChange={(e) => handleDateReceptionChange(item.id, e.target.value)}
+                            />
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
+
+                {/* ✅ Afficher le nombre d'items complétés */}
+                <p className="text-sm text-muted-foreground">
+                  {bonReceptionItems.filter(item =>
+                    item.quantite_recu &&
+                    parseInt(item.quantite_recu) > 0 &&
+                    item.numero_bon_reception?.trim() &&
+                    item.date_reception
+                  ).length} / {bonReceptionItems.length} article(s) prêt(s) à être envoyé(s)
+                </p>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t">
