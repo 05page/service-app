@@ -21,7 +21,7 @@ const Landing = () => {
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
                 <ShoppingCart className="h-5 w-5 text-primary-foreground" />
               </div>
-              <h1 className="text-xl font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">CommercePro</h1>
+              <h1 className="text-xl font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">EntraLevel</h1>
             </div>
             <Link to="/auth">
               <Button variant="outline" className="gap-2 hover-scale">
@@ -62,10 +62,6 @@ const Landing = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="gap-2 px-8 py-6 text-lg hover-scale">
-              <Zap className="h-5 w-5" />
-              Voir la démo
-            </Button>
           </div>
 
           {/* Stats */}
@@ -292,7 +288,7 @@ const Landing = () => {
                 Prêt à démarrer ?
               </h3>
               <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                Rejoignez des centaines d'entreprises qui font confiance à CommercePro
+                Rejoignez des centaines d'entreprises qui font confiance à EntraLevel
               </p>
               <Link to="/auth">
                 <Button size="lg" className="gap-2 px-8 py-6 text-lg group hover-scale">
@@ -309,7 +305,7 @@ const Landing = () => {
       <footer className="relative border-t bg-background/80 backdrop-blur-md">
         <div className="container mx-auto px-6 py-8">
           <div className="text-center text-muted-foreground">
-            <p>&copy; 2024 CommercePro. Plateforme de gestion commerciale.</p>
+            <p>&copy; 2025 Entralevel. Plateforme de gestion commerciale.</p>
           </div>
         </div>
       </footer>

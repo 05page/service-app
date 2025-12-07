@@ -68,7 +68,7 @@ export function AppSidebar({ activeSection, onSectionChange, userRole }: Sidebar
     <div className="w-64 bg-sidebar border-r border-sidebar-border h-screen flex flex-col">
       <div className="p-6 border-b border-sidebar-border">
         <h1 className="text-xl font-bold text-sidebar-foreground">
-          CommercePro
+          EntraLevel
         </h1>
         <p className="text-sm text-sidebar-foreground/70 mt-1">
           Gestion commerciale
