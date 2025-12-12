@@ -14,17 +14,7 @@ interface StockHistoryDialogProps {
 export default function StockHistoryDialog({ open, onOpenChange, historique }: StockHistoryDialogProps) {
   if (!historique) return null;
 
-  const { stock, statistiques, historique: history } = historique;
-
-  // Filtrer les doublons dans l'historique en utilisant l'ID unique
-  const uniqueHistory = history?.reduce((acc: any[], mouvement: any) => {
-    // Vérifier si ce mouvement existe déjà dans l'accumulateur
-    const exists = acc.find((m: any) => m.id === mouvement.id);
-    if (!exists) {
-      acc.push(mouvement);
-    }
-    return acc;
-  }, []) || [];
+  const { stock, statistiques, achats_lies, historique: history } = historique;
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -75,7 +65,7 @@ export default function StockHistoryDialog({ open, onOpenChange, historique }: S
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Article</p>
-                    <p className="font-semibold">{stock?.achat?.items && stock.achat.items.length > 0 ? stock.achat.items[0].nom_service : "Non défini"}</p>
+                    <p className="font-semibold">{stock?.achat?.items && stock.achat.items.length > 0  ? stock.achat.items[0].nom_service : "Non défini"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Code produit</p>
@@ -140,12 +130,45 @@ export default function StockHistoryDialog({ open, onOpenChange, historique }: S
               </Card>
             </div>
 
+            {/* Achats liés */}
+            {achats_lies && achats_lies.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-3">Achats utilisés pour ce stock</h3>
+                <div className="space-y-2">
+                  {achats_lies.map((achat: any, index: number) => (
+                    <Card key={index}>
+                      <CardContent className="pt-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Numéro</p>
+                            <p className="font-medium">{achat.numero_achat}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Quantité</p>
+                            <p className="font-bold text-green-600">+{achat.quantite}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Prix unitaire</p>
+                            <p className="font-medium">{achat.prix_unitaire} FCFA</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Fournisseur</p>
+                            <p className="font-medium">{achat.fournisseur?.nom_fournisseurs}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Historique des mouvements */}
             <div>
               <h3 className="font-semibold mb-3">Historique des mouvements</h3>
               <div className="space-y-3">
-                {uniqueHistory && uniqueHistory.length > 0 ? (
-                  uniqueHistory.map((mouvement: any, index: number) => (
+                {history && history.length > 0 ? (
+                  history.map((mouvement: any, index: number) => (
                     <Card key={index} className="overflow-hidden">
                       <CardContent className="pt-4">
                         <div className="flex items-start gap-3">

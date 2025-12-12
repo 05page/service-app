@@ -348,7 +348,7 @@ export function StockSection() {
 
       // Si le path ne commence pas par http, ajouter l'URL de base
       if (imagePath && !imagePath.startsWith('http')) {
-        const baseURL = 'http://127.0.0.1:8000/'; // Votre URL backend
+        const baseURL = 'http://127.0.0.1:8000/'; // Votre URL backend https://api.entralevel.ci/
         const fullUrl = baseURL + imagePath;
         console.log('URL complète:', fullUrl);
         return fullUrl;
