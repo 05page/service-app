@@ -18,11 +18,14 @@ import {
   BarChart3,
   TrendingDown,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { toast } from 'sonner';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { set } from "date-fns";
 
 
 type Stats = {
@@ -80,6 +83,22 @@ export const DashboardAdmin = () => {
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true)
   const [showGraphs, setShowGraphs] = useState(false);
+
+  const [showMontant, setShowMontant] = useState(false);
+  const formartMontant = (montant: number | string) => {
+    if(!showMontant){
+      return '****'}
+     const montantNumber = typeof montant === 'string' ? parseFloat(montant) : montant;
+     return montantNumber.toLocaleString(); 
+  }
+
+  const handleToggleMontant = () => {
+    if(showMontant){
+      setShowMontant(false)
+    }else{
+      setShowMontant(true)
+    }
+  }
 
   const fecthDashboard = async () => {
     try {
@@ -249,7 +268,24 @@ export const DashboardAdmin = () => {
           <h1 className="text-3xl font-bold text-foreground">Tableau de bord Administrateur</h1>
           <p className="text-muted-foreground">Vue d'ensemble complète de votre activité commerciale</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <Button
+          variant={showMontant ? "default" : "outline"} size="sm" onClick={handleToggleMontant}
+          >
+            {showMontant ? (
+              <>
+              <EyeOff className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Masquer le montant</span>
+              <span className="hidden sm:hidden">Masquer</span>
+              </>
+            ): (
+              <>
+              <Eye className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Voir le montant</span>
+              <span className="hidden sm:hidden">Voir</span>
+              </>
+            )}
+          </Button>
           <Button
             variant={showGraphs ? "default" : "outline"}
             onClick={() => setShowGraphs(!showGraphs)}
@@ -295,20 +331,43 @@ export const DashboardAdmin = () => {
         </CardHeader>
         <CardContent>
           <div className={`text-4xl font-bold ${isBeneficePositif ? 'text-green-600' : 'text-red-600'}`}>
+            {showMontant ? 
+            <>
             {isBeneficePositif ? '+' : ''}{benefice.toLocaleString()} Fcfa
+            </>
+            : '****'
+            }
           </div>
           <div className="flex gap-6 mt-4 text-sm">
             <div>
               <p className="text-muted-foreground">Revenus totaux</p>
-              <p className="font-semibold text-green-600">+{stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa</p>
+              <p className="font-semibold text-green-600">
+                {showMontant ?
+                <>
+                +{stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa
+                </>
+                : '****'}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">Achats totaux</p>
-              <p className="font-semibold text-red-600">-{(allStats?.total_prix_achats || 0).toLocaleString()} Fcfa</p>
+              <p className="font-semibold text-red-600">
+                {showMontant ?
+                <>
+                -{allStats?.total_prix_achats?.toLocaleString() || 0} Fcfa
+                </>
+                : '****'}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">Commissions payées</p>
-              <p className="font-semibold text-orange-600">-{stats?.total_commissions_reversees?.toLocaleString() || 0} Fcfa</p>
+              <p className="font-semibold text-orange-600">
+                {showMontant ?
+                <>
+                -{stats?.total_commissions_reversees?.toLocaleString() || 0} Fcfa
+                </>
+                : '****'}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -324,7 +383,13 @@ export const DashboardAdmin = () => {
             <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa</div>
+            <div className="text-2xl font-bold text-green-600">
+              {showMontant ?
+              <>
+              {stats?.chiffres_affaire_total?.toLocaleString() || 0} Fcfa
+              </>
+              : '****'}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               Chiffre d'affaires total
             </p>
@@ -369,7 +434,13 @@ export const DashboardAdmin = () => {
             <Wallet className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats?.total_commissions_dues?.toLocaleString() || 0} Fcfa</div>
+            <div className="text-2xl font-bold text-orange-600">
+              {showMontant ?
+              <>
+              {stats?.total_commissions_dues?.toLocaleString() || 0} Fcfa
+              </>
+              : '****'}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               À reverser
             </p>
@@ -417,7 +488,14 @@ export const DashboardAdmin = () => {
             <Wallet className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats?.total_commissions_reversees?.toLocaleString() || 0} Fcfa</div>
+            <div className="text-2xl font-bold text-green-600">
+              {showMontant ? 
+              <>
+                {stats?.total_commissions_reversees?.toLocaleString() || 0} Fcfa
+              </> 
+              : '****' 
+            }
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               Déjà payées
             </p>

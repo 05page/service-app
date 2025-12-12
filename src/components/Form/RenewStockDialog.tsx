@@ -67,7 +67,7 @@ export default function RenewStockDialog({
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-muted-foreground">Nom:</span>
-                <p className="font-medium">{stock?.achat?.nom_service}</p>
+                <p className="font-medium">{stock?.achat?.items && stock.achat.items.length > 0  ? stock.achat.items[0].nom_service : "Non défini"}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Code:</span>

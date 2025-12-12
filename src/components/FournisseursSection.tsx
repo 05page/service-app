@@ -73,6 +73,7 @@ export function FournisseursSection() {
   // ✅ Gestion de la création avec FormFournisseur
   const handleCreateSubmit = async (data: any) => {
     setIsSubmitting(true);
+    console.log('Données soumises pour création:', data);
     try {
       const response = await api.post('/fournisseurs/', data);
       toast.success(response.data.message || 'Fournisseur créé avec succès');

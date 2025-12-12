@@ -250,7 +250,11 @@ export function StockSection() {
   // Fonction pour afficher l'historique d'un stock
   const handleShowHistory = async (stock: any) => {
     try {
+      console.log('=== CHARGEMENT HISTORIQUE ===');
+      console.log('Stock ID:', stock.id);
       const response = await api.get(`/stock/${stock.id}/historique`);
+      console.log('Réponse complète:', response.data);
+      console.log('Données reçues:', response.data.data);
       setStockHistorique(response.data.data);
       setHistoryDialogOpen(true);
     } catch (error: any) {
@@ -333,9 +337,10 @@ export function StockSection() {
 
   const getImages = (item: any) => {
     console.log('Item reçu:', item);
-    console.log('Photos:', item?.achat?.photos || item?.photos);
+    console.log('Photos dans achat.items:', item?.achat?.items?.[0]?.photos);
 
-    const photos = item?.achat?.photos || item?.photos;
+    // L'image se trouve dans item.achat.items[0].photos
+    const photos = item?.achat?.items?.[0]?.photos;
 
     if (photos && Array.isArray(photos) && photos.length > 0) {
       const imagePath = photos[0].path;

@@ -173,6 +173,13 @@ export function AchatsSection() {
   // Fonction pour gérer la soumission
   const handleFormSubmit = async (formData: FormData) => {
     try {
+      // Debug: Log les données envoyées
+      console.log('=== DONNÉES ENVOYÉES AU BACKEND ===');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
+      console.log('=====================================');
+
       const response = await api.post('/achat/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -184,6 +191,9 @@ export function AchatsSection() {
       await Promise.all([getAchats(), fecthAchats()]);
     } catch (error: any) {
       console.error('Erreur création achat:', error.response?.data);
+      console.error('Status code:', error.response?.status);
+      console.error('Headers:', error.response?.headers);
+
       const message = error.response?.data?.message || "Erreur lors de l'ajout de l'achat";
       toast.error(message);
       throw error; // Important pour que le formulaire sache que ça a échoué
@@ -195,6 +205,13 @@ export function AchatsSection() {
     if (!selectAchat) return;
 
     try {
+      // Debug: Log les données envoyées
+      console.log('=== DONNÉES MISE À JOUR ENVOYÉES ===');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
+      console.log('=====================================');
+
       const response = await api.post(`/achat/${selectAchat.id}?_method=PUT`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -205,7 +222,10 @@ export function AchatsSection() {
       setEditDialogOpen(false);
       await Promise.all([getAchats(), fecthAchats()]);
     } catch (error: any) {
-      console.error(error.response?.data);
+      console.error('Erreur mise à jour achat:', error.response?.data);
+      console.error('Status code:', error.response?.status);
+      console.error('Headers:', error.response?.headers);
+
       const message = error?.response?.data?.message || "Erreur survenue lors de la mise à jour de l'achat";
       toast.error(message);
       throw error;
@@ -345,8 +365,8 @@ export function AchatsSection() {
         const itemsData = selectedAchat.items
           // Filtrer les articles déjà reçus (ceux qui ont un numero_bon_reception)
           .filter((item: any) => {
-            const hasNumeroBon = item.numero_bon_reception && 
-                                 item.numero_bon_reception.toString().trim() !== '';
+            const hasNumeroBon = item.numero_bon_reception &&
+              item.numero_bon_reception.toString().trim() !== '';
             return !hasNumeroBon;
           })
           .map((item: any) => ({
@@ -447,8 +467,8 @@ export function AchatsSection() {
     }
 
     const errors: string[] = [];
-    itemsSubmit.forEach((item, index) => {
-      if (parseInt(item.quantite_recu) > item.quantite) {
+    itemsSubmit.forEach((item) => {
+      if (parseInt(item.quantite_recu, 10) > item.quantite) {
         errors.push(
           `${item.nom_service}: La quantité reçue (${item.quantite_recu}) dépasse la quantité commandée (${item.quantite})`
         );
@@ -461,33 +481,67 @@ export function AchatsSection() {
     }
 
     setIsSubmittingBonReception(true);
+
     try {
       const formData = new FormData();
 
-      // Ajouter chaque item
+      // envoyer en tant que items[0][...], items[1][...] — Laravel reconstitue bien le tableau
       itemsSubmit.forEach((item, index) => {
-        formData.append(`items[${index}][id]`, item.id.toString());
-        formData.append(`items[${index}][quantite_recu]`, parseInt(item.quantite_recu).toString());
-        formData.append(`items[${index}][numero_bon_reception]`, item.numero_bon_reception);  // ✅ Pas de parseInt
-        formData.append(`items[${index}][date_reception]`, item.date_reception);  // ✅ Pas de parseInt
+        console.log(`Item ${index}:`, item); // Debug: voir les données des items
+        const itemId = parseInt(String(item.id), 10);
+        const quantiteRecu = parseInt(item.quantite_recu, 10);
+
+        if (isNaN(itemId) || itemId <= 0) {
+          throw new Error(`ID d'article invalide: ${item.id}`);
+        }
+
+        if (isNaN(quantiteRecu) || quantiteRecu < 1) {
+          throw new Error(`Quantité reçue invalide pour ${item.nom_service}: ${item.quantite_recu}`);
+        }
+
+        formData.append(`items[${index}][id]`, String(itemId));
+        formData.append(`items[${index}][quantite_recu]`, String(quantiteRecu));
+        formData.append(`items[${index}][numero_bon_reception]`, item.numero_bon_reception?.trim() || '');
+        formData.append(`items[${index}][date_reception]`, item.date_reception?.trim() || '');
       });
 
-      //DEBUG : Afficher ce qui est envoyé
-      console.log("=== DONNÉES ENVOYÉES ===");
-      for (let [key, value] of formData.entries()) {
-        console.log(`${key}:`, value);
+      // debug (optionnel)
+      console.log("=== DONNÉES ENVOYÉES (FormData) ===");
+      for (const [key, value] of (formData as any).entries()) {
+        console.log(key, value);
       }
+
+      // Vérifier que tous les items ont des données valides
+      const invalidItems = itemsSubmit.filter(item =>
+        !item.id ||
+        !item.quantite_recu ||
+        parseInt(item.quantite_recu, 10) < 1 ||
+        !item.numero_bon_reception ||
+        !item.date_reception
+      );
+
+      if (invalidItems.length > 0) {
+        console.error("Items invalides:", invalidItems);
+        toast.error("Certains articles ont des données invalides");
+        return;
+      }
+
+      // Debug: vérifier les données avant envoi
+      console.log("=== DEBUG AVANT ENVOI ===");
+      console.log("Achat ID:", achatForBonReception.id);
+      console.log("Items à soumettre:", itemsSubmit);
+      console.log("Premier item:", itemsSubmit[0]);
+      console.log("ID du premier item:", itemsSubmit[0]?.id);
+      console.log("Type de l'ID:", typeof itemsSubmit[0]?.id);
 
       toast.info("Envoi du bon de réception en cours...");
 
       const response = await api.post(
         `/achat/${achatForBonReception.id}/addBonReception`,
         formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
+        // IMPORTANT : ne PAS définir Content-Type manuellement ici.
+        // Le navigateur ajoutera le header multipart/form-data avec le boundary.
+        {}
       );
 
       toast.success(response.data.message || "Bon de réception ajouté avec succès");
@@ -495,28 +549,23 @@ export function AchatsSection() {
       setAchatForBonReception(null);
       setBonReceptionItems([]);
       await Promise.all([getAchats(), fecthAchats()]);
-
     } catch (error: any) {
       console.error("Erreur lors de l'ajout du bon de réception:", error);
+      console.error("Status:", error.response?.status);
+      console.error("Response data:", error.response?.data);
 
-      const errorMessage = error.response?.data?.message
-      toast.error(errorMessage);
+      const errorMessage = error.response?.data?.message;
+      toast.error(errorMessage || "Erreur lors de la soumission");
 
-      // Afficher les erreurs de validation
       if (error.response?.data?.errors) {
         Object.entries(error.response.data.errors).forEach(([field, messages]: [string, any]) => {
           toast.error(`${field}: ${messages[0]}`);
         });
       }
-
-      // Afficher les détails de debug si disponibles
-      if (error.response?.data?.debug) {
-        console.error("Debug info:", error.response.data.debug);
-      }
     } finally {
       setIsSubmittingBonReception(false);
     }
-  };
+  }; 
 
   useEffect(() => {
     if (fournisseurId) {

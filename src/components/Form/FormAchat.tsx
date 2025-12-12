@@ -287,16 +287,46 @@ export default function FormAchat({
       return false;
     }
 
-    const itemsValides = items.every(item =>
-      item.nom_service &&
-      item.quantite &&
-      item.prix_unitaire &&
-      item.date_commande
-    );
-
-    if (!itemsValides) {
-      toast.error("Veuillez remplir tous les champs obligatoires pour chaque article");
+    // Vérifier que le fournisseur a des services
+    const fournisseur = fournisseurs.find(f => f.id.toString() === fournisseurId);
+    if (!fournisseur || !fournisseur.services || !Array.isArray(fournisseur.services) || fournisseur.services.length === 0) {
+      toast.error("Le fournisseur sélectionné n'a pas de services disponibles");
       return false;
+    }
+
+    // Vérifier que tous les items ont les champs requis
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      if (!item.nom_service || !item.nom_service.trim()) {
+        toast.error(`Article ${i + 1}: Veuillez sélectionner un service`);
+        return false;
+      }
+
+      if (!item.quantite || isNaN(Number(item.quantite)) || Number(item.quantite) <= 0) {
+        toast.error(`Article ${i + 1}: Veuillez saisir une quantité valide`);
+        return false;
+      }
+
+      if (!item.prix_unitaire || isNaN(Number(item.prix_unitaire)) || Number(item.prix_unitaire) <= 0) {
+        toast.error(`Article ${i + 1}: Veuillez saisir un prix unitaire valide`);
+        return false;
+      }
+
+      if (!item.date_commande) {
+        toast.error(`Article ${i + 1}: Veuillez saisir une date de commande`);
+        return false;
+      }
+
+      // Vérifier que la date de livraison n'est pas antérieure à la date de commande
+      if (item.date_livraison && item.date_commande) {
+        const dateCommande = new Date(item.date_commande);
+        const dateLivraison = new Date(item.date_livraison);
+        if (dateLivraison < dateCommande) {
+          toast.error(`Article ${i + 1}: La date de livraison ne peut pas être antérieure à la date de commande`);
+          return false;
+        }
+      }
     }
 
     return true;
@@ -314,6 +344,13 @@ export default function FormAchat({
     formData.append('statut', initialData?.statut || 'commande');
     if (description) formData.append('description', description);
 
+    // Debug: Log les données avant envoi
+    console.log('=== DONNÉES FORMULAIRE ===');
+    console.log('fournisseur_id:', fournisseurId);
+    console.log('statut:', initialData?.statut || 'commande');
+    console.log('description:', description);
+    console.log('items:', items);
+
     // Ajouter les items
     items.forEach((item, index) => {
       // Si c'est une mise à jour, envoyer l'ID de l'item
@@ -322,8 +359,8 @@ export default function FormAchat({
       }
 
       formData.append(`items[${index}][nom_service]`, item.nom_service);
-      formData.append(`items[${index}][quantite]`, item.quantite);
-      formData.append(`items[${index}][prix_unitaire]`, item.prix_unitaire);
+      formData.append(`items[${index}][quantite]`, Number(item.quantite).toString());
+      formData.append(`items[${index}][prix_unitaire]`, Number(item.prix_unitaire).toString());
       formData.append(`items[${index}][date_commande]`, item.date_commande);
       if (item.date_livraison) {
         formData.append(`items[${index}][date_livraison]`, item.date_livraison);
@@ -341,6 +378,11 @@ export default function FormAchat({
         formData.append(`items[${index}][photos][]`, photo);
       });
     });
+
+    console.log('=== FORMDATA FINAL ===');
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}:`, value);
+    }
 
     await onSubmit(formData);
   };

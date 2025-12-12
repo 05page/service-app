@@ -284,6 +284,23 @@ export function PersonnelSection() {
     };
   };
 
+
+  const handleDetails = async (employe: any) => {
+    setSelectedPersonnelDetails(employe);
+    setLoadingStats(true);
+    setDetailsDialogOpen(true);
+    try {
+      const response = await api.get(`/admin/personnelStats/${employe.id}`);
+      setPersonnelStats(response.data.data);
+    } catch (error: any) {
+      console.error('Erreur chargement stats:', error);
+      toast.error('Erreur lors du chargement des statistiques');
+      setPersonnelStats(null);
+    } finally {
+      setLoadingStats(false);
+    }
+
+  }
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -299,28 +316,30 @@ export function PersonnelSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Personnel</h1>
-          <p className="text-muted-foreground">Gérez votre équipe et leurs performances</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Personnel</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Gérez votre équipe et leurs performances</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Actualiser
+            <span className="hidden sm:inline">Actualiser</span>
           </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button size="sm">
                 <Plus className="mr-2 h-4 w-4" />
-                Nouvel Employé
+                <span className="hidden sm:inline">Nouvel Employé</span>
+                <span className="sm:hidden">Ajouter</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Ajouter un nouvel employé</DialogTitle>
               </DialogHeader>
@@ -672,7 +691,16 @@ export function PersonnelSection() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end gap-1 flex-wrap">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Voir détails"
+                              onClick={()=> handleDetails(employe)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
@@ -743,6 +771,15 @@ export function PersonnelSection() {
         itemName={`${personnelDelete?.fullname}`}
         description="Cela supprimera toutes les actions liées à cet employé. Cette action est irréversible."
         isDeleting={isDeleting}
+      />
+
+      {/* Dialog des détails du personnel */}
+      <PersonnelDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        personnel={selectedPersonnelDetails}
+        stats={personnelStats}
+        loading={loadingStats}
       />
     </div>
   );
