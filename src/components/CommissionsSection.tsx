@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Pagination } from "@/components/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 import {
   Search,
   DollarSign,
@@ -257,6 +259,17 @@ export function CommissionSection() {
 
   const displayedCommissions = getFilteredByTab();
 
+  // Pagination
+  const {
+    currentPage,
+    totalPages,
+    currentData: paginatedCommissions,
+    goToPage
+  } = usePagination({
+    data: displayedCommissions,
+    itemsPerPage: 10
+  });
+
   const getStatutColor = (etat: boolean | number | string) => {
     return (etat === true || etat === 1 || etat === "1" || etat === "true") ? "default" : "destructive";
   };
@@ -469,8 +482,8 @@ export function CommissionSection() {
               </div>
 
               <div className="space-y-4">
-                {displayedCommissions.length > 0 ? (
-                  displayedCommissions.map((commission) => (
+                {paginatedCommissions.length > 0 ? (
+                  paginatedCommissions.map((commission) => (
                     <Card key={commission.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-6">
                         <div className="flex flex-col space-y-4">
@@ -542,6 +555,17 @@ export function CommissionSection() {
                   </Card>
                 )}
               </div>
+
+              {/* Pagination */}
+              {displayedCommissions.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={displayedCommissions.length}
+                  itemsPerPage={10}
+                  onPageChange={goToPage}
+                />
+              )}
             </>
           )}
         </TabsContent>

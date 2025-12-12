@@ -105,8 +105,10 @@ export function AchatsSection() {
     quantite: number;
     quantite_recu: string;
     numero_bon_reception: string;
-    date_reception: string
+    date_reception: string;
     bon_reception_file: File | null;
+    statut_item?: string;
+    motif_partiel?: string;
   }>>([]);
   const [isSubmittingBonReception, setIsSubmittingBonReception] = useState(false);
 
@@ -375,7 +377,10 @@ export function AchatsSection() {
             quantite: item.quantite || 0,
             quantite_recu: item.quantite_recu?.toString() || '',
             numero_bon_reception: item.numero_bon_reception || '',
-            date_reception: item.date_reception || ""
+            date_reception: item.date_reception || "",
+            bon_reception_file: null,
+            statut_item: item.statut_item || 'commande',
+            motif_partiel: item.motif_partiel || ''
           }));
         setBonReceptionItems(itemsData);
         setBonReceptionDialogOpen(true);
@@ -449,6 +454,23 @@ export function AchatsSection() {
     );
   };
 
+  // Gérer le changement du motif partiel
+  const handleMotifPartielChange = (itemId: number, value: string) => {
+    setBonReceptionItems(prev =>
+      prev.map(item =>
+        item.id === itemId
+          ? { ...item, motif_partiel: value }
+          : item
+      )
+    );
+  };
+
+  // Vérifier si la quantité reçue est partielle
+  const isPartialReception = (item: { quantite: number; quantite_recu: string }) => {
+    const qteRecu = parseInt(item.quantite_recu) || 0;
+    return qteRecu > 0 && qteRecu < item.quantite;
+  };
+
   // Soumettre le bon de réception
   const handleSubmitBonReception = async () => {
     if (!achatForBonReception) return;
@@ -503,6 +525,11 @@ export function AchatsSection() {
         formData.append(`items[${index}][quantite_recu]`, String(quantiteRecu));
         formData.append(`items[${index}][numero_bon_reception]`, item.numero_bon_reception?.trim() || '');
         formData.append(`items[${index}][date_reception]`, item.date_reception?.trim() || '');
+        
+        // Ajouter le motif partiel si réception partielle
+        if (quantiteRecu < item.quantite && item.motif_partiel) {
+          formData.append(`items[${index}][motif_partiel]`, item.motif_partiel.trim());
+        }
       });
 
       // debug (optionnel)
@@ -1353,6 +1380,9 @@ export function AchatsSection() {
                     item.numero_bon_reception?.trim() &&
                     item.date_reception;
 
+                  // Vérifier si réception partielle
+                  const isPartial = isPartialReception(item);
+
                   return (
                     <Card
                       key={item.id}
@@ -1366,11 +1396,18 @@ export function AchatsSection() {
                               Quantité commandée: {item.quantite}
                             </p>
                           </div>
-                          {isItemComplete && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              ✓ Complet
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {isPartial && (
+                              <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200">
+                                Partiel
+                              </Badge>
+                            )}
+                            {isItemComplete && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                ✓ Complet
+                              </Badge>
+                            )}
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1414,6 +1451,26 @@ export function AchatsSection() {
                             />
                           </div>
                         </div>
+
+                        {/* Champ motif partiel affiché uniquement si réception partielle */}
+                        {isPartial && (
+                          <div className="pt-2 border-t">
+                            <Label htmlFor={`motif_partiel_${item.id}`}>
+                              Motif de réception partielle *
+                            </Label>
+                            <Input
+                              id={`motif_partiel_${item.id}`}
+                              type="text"
+                              value={item.motif_partiel || ''}
+                              onChange={(e) => handleMotifPartielChange(item.id, e.target.value)}
+                              placeholder="Ex: Rupture de stock fournisseur, livraison en 2 temps..."
+                              className="mt-1"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Quantité restante: {item.quantite - (parseInt(item.quantite_recu) || 0)}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </Card>
                   );
