@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Pagination } from "@/components/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 import {
   Search,
   DollarSign,
@@ -255,7 +257,18 @@ export function CommissionSection() {
     return filteredCommissions;
   };
 
-  const displayedCommissions = getFilteredByTab();
+  const filteredByTab = getFilteredByTab();
+
+  // Pagination
+  const {
+    currentPage,
+    totalPages,
+    currentData: displayedCommissions,
+    setCurrentPage,
+  } = usePagination({
+    data: filteredByTab,
+    itemsPerPage: 10
+  });
 
   const getStatutColor = (etat: boolean | number | string) => {
     return (etat === true || etat === 1 || etat === "1" || etat === "true") ? "default" : "destructive";
@@ -470,67 +483,78 @@ export function CommissionSection() {
 
               <div className="space-y-4">
                 {displayedCommissions.length > 0 ? (
-                  displayedCommissions.map((commission) => (
-                    <Card key={commission.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold text-lg">
-                                {commission.user?.fullname || 'N/A'}
-                              </h3>
-                              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                Vente: {commission.vente?.reference || 'N/A'}
-                              </p>
+                  <>
+                    {displayedCommissions.map((commission) => (
+                      <Card key={commission.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  {commission.user?.fullname || 'N/A'}
+                                </h3>
+                                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Vente: {commission.vente?.reference || 'N/A'}
+                                </p>
+                              </div>
+                              <Badge variant={getStatutColor(commission.etat_commission)}>
+                                {getStatutLabel(commission.etat_commission)}
+                              </Badge>
                             </div>
-                            <Badge variant={getStatutColor(commission.etat_commission)}>
-                              {getStatutLabel(commission.etat_commission)}
-                            </Badge>
-                          </div>
 
-                          <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground mb-1">Prix vente</p>
-                              <p className="font-semibold text-sm">
-                                {parseFloat(commission.vente?.prix_total || 0).toLocaleString('fr-FR')} Fcfa
-                              </p>
+                            <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground mb-1">Prix vente</p>
+                                <p className="font-semibold text-sm">
+                                  {parseFloat(commission.vente?.prix_total || 0).toLocaleString('fr-FR')} Fcfa
+                                </p>
+                              </div>
+                              <div className="text-center border-x">
+                                <p className="text-xs text-muted-foreground mb-1">Taux</p>
+                                <p className="font-semibold text-sm">
+                                  {commission.user?.taux_commission || 0}%
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground mb-1">Commission</p>
+                                <p className="font-semibold text-sm text-green-600">
+                                  {parseFloat(commission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-center border-x">
-                              <p className="text-xs text-muted-foreground mb-1">Taux</p>
-                              <p className="font-semibold text-sm">
-                                {commission.user?.taux_commission || 0}%
-                              </p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground mb-1">Commission</p>
-                              <p className="font-semibold text-sm text-green-600">
-                                {parseFloat(commission.commission_due || 0).toLocaleString('fr-FR')} Fcfa
-                              </p>
-                            </div>
-                          </div>
 
-                          <div className="flex gap-2 justify-end pt-2 border-t">
-                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(commission)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Détails
-                            </Button>
-                            {(commission.etat_commission === 0 || 
-                              commission.etat_commission === false || 
-                              commission.etat_commission === "0" || 
-                              commission.etat_commission === "false" ||
-                              commission.etat_commission === null ||
-                              commission.etat_commission === undefined) && (
-                              <Button size="sm" onClick={() => handleOpenPayDialog(commission)}>
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                Payer
+                            <div className="flex gap-2 justify-end pt-2 border-t">
+                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(commission)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Détails
                               </Button>
-                            )}
+                              {(commission.etat_commission === 0 || 
+                                commission.etat_commission === false || 
+                                commission.etat_commission === "0" || 
+                                commission.etat_commission === "false" ||
+                                commission.etat_commission === null ||
+                                commission.etat_commission === undefined) && (
+                                <Button size="sm" onClick={() => handleOpenPayDialog(commission)}>
+                                  <CreditCard className="h-4 w-4 mr-2" />
+                                  Payer
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
+                        </CardContent>
+                      </Card>
+                    ))}
+                    
+                    {/* Pagination */}
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={filteredByTab.length}
+                      itemsPerPage={10}
+                      onPageChange={setCurrentPage}
+                    />
+                  </>
                 ) : (
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
