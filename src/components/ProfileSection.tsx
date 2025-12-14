@@ -66,7 +66,7 @@ export function ProfileSection({ userRole }: ProfileSectionProps) {
                 return
 
             }
-            console.log(token);
+            // console.log(token);
 
             const response = await api.get('/profil');
             setProfileUser(response.data.data);

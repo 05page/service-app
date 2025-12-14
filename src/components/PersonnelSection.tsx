@@ -59,9 +59,9 @@ export function PersonnelSection() {
 
       const responses = await api.get('/admin/showEmploye');
       setPersonnels(responses.data.data || []);
-      console.log("Personnels récupérés:", responses.data.data);
+      // console.log("Personnels récupérés:", responses.data.data);
     } catch (error: any) {
-      console.log('erreur de récupération', error);
+      // console.log('erreur de récupération', error);
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
       } else if (error.response?.status === 403) {

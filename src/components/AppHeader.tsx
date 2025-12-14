@@ -17,7 +17,7 @@ export function AppHeader({ userRole }: AppHeaderProps) {
   // Récupérer le nom d'utilisateur du localStorage ou utiliser un nom par défaut
   const getUserName = () => {
     const storedName = localStorage.getItem("userName");
-    console.log(storedName)
+    // console.log(storedName)
     if (storedName) return storedName;
 
     switch (userRole) {

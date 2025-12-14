@@ -125,18 +125,18 @@ export default function FormAchat({
           };
 
           // Debug: afficher les données de l'item
-          console.log('Item chargé:', {
-            id: item.id,
-            nom_service: item.nom_service,
-            photos: item.photos,
-            photosCount: item.photos?.length || 0
-          });
+          // console.log('Item chargé:', {
+          //   id: item.id,
+          //   nom_service: item.nom_service,
+          //   photos: item.photos,
+          //   photosCount: item.photos?.length || 0
+          // });
 
           // Récupérer les photos de l'item
           // Les photos peuvent être dans item.photos (relation chargée)
           const itemPhotos = item.photos || [];
 
-          console.log('Photos trouvées pour l\'item:', itemPhotos);
+          // console.log('Photos trouvées pour l\'item:', itemPhotos);
 
           return {
             id: item.id,
@@ -150,14 +150,14 @@ export default function FormAchat({
             photoPreviews: itemPhotos.map((p: any) => {
               const photoPath = p.path || p;
               const url = typeof photoPath === 'string' ? getPhotoUrl(photoPath) : "";
-              console.log('Photo URL construite:', { original: photoPath, url });
+              // console.log('Photo URL construite:', { original: photoPath, url });
               return url;
             }).filter((url: string) => url !== ""),
             existingPhotoIds: itemPhotos.map((p: any) => p.id || p).filter((id: any) => id !== undefined && id !== null) || [],
             photosToDelete: []
           };
         });
-        console.log('Items formatés:', formattedItems);
+        // console.log('Items formatés:', formattedItems);
         setItems(formattedItems);
       }
     }
@@ -345,11 +345,11 @@ export default function FormAchat({
     if (description) formData.append('description', description);
 
     // Debug: Log les données avant envoi
-    console.log('=== DONNÉES FORMULAIRE ===');
-    console.log('fournisseur_id:', fournisseurId);
-    console.log('statut:', initialData?.statut || 'commande');
-    console.log('description:', description);
-    console.log('items:', items);
+    // console.log('=== DONNÉES FORMULAIRE ===');
+    // console.log('fournisseur_id:', fournisseurId);
+    // console.log('statut:', initialData?.statut || 'commande');
+    // console.log('description:', description);
+    // console.log('items:', items);
 
     // Ajouter les items
     items.forEach((item, index) => {
@@ -379,10 +379,10 @@ export default function FormAchat({
       });
     });
 
-    console.log('=== FORMDATA FINAL ===');
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
-    }
+    // console.log('=== FORMDATA FINAL ===');
+    // for (let [key, value] of formData.entries()) {
+    //   console.log(`${key}:`, value);
+    // }
 
     await onSubmit(formData);
   };
@@ -601,9 +601,9 @@ export default function FormAchat({
                               // Optionnel: masquer l'image en cas d'erreur
                               // e.currentTarget.style.display = 'none';
                             }}
-                            onLoad={() => {
-                              console.log('Image chargée avec succès:', preview);
-                            }}
+                            // onLoad={() => {
+                            //   console.log('Image chargée avec succès:', preview);
+                            // }}
                           />
                           <button
                             type="button"

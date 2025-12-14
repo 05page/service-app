@@ -116,9 +116,9 @@ export const DashboardAdmin = () => {
       setAllStats(responsesStats.data.data);
       setMonthlyData(monthlyResponse.data.data || []);
       
-      console.log('Dashboard:', response.data.data);
-      console.log('All Stats:', responsesStats.data.data);
-      console.log('Monthly Data:', monthlyResponse.data.data);
+      // console.log('Dashboard:', response.data.data);
+      // console.log('All Stats:', responsesStats.data.data);
+      // console.log('Monthly Data:', monthlyResponse.data.data);
     } catch (error) {
       console.error('Erreur de récupération du dashboard', error);
       toast.error('Erreur lors du chargement des données');

@@ -44,7 +44,7 @@ export function ClientsSection() {
       setClient(response.data.data || []);
 
     } catch (error: any) {
-      console.log('Erreur de récupération', error);
+      // console.log('Erreur de récupération', error);
       if (error.response?.status === 401) {
         toast.error('Token invalide ou expiré. Veuillez vous reconnecter');
       } else {
