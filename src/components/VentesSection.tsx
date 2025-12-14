@@ -98,7 +98,7 @@ export function VentesSection() {
       const endpoint = role === "admin" ? "/allStats" : "/ventes/myStats";
       const response = await api.get(endpoint);
       setVentes(response.data.data)
-      console.log(response.data.data)
+      // console.log(response.data.data)
     } catch (error: any) {
       console.error('Erreur de récupération', error);
       if (error.response?.status === 401) {
@@ -134,9 +134,9 @@ export function VentesSection() {
     try {
       const response = await api.get('/admin/showEmploye')
       setSelectCommissionaire(response.data.data || [])
-      console.log(response.data.data)
+      // console.log(response.data.data)
     } catch (error: any) {
-      console.log('erreur de récupération', error);
+      // console.log('erreur de récupération', error);
     }
   }
 

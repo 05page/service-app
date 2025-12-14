@@ -25,11 +25,11 @@ export function PersonnelDetailsDialog({
   if (!personnel) return null;
 
   // Debug log
-  if (stats) {
-    console.log('Stats reçues:', stats);
-    console.log('commissions_dues:', stats.commissions_dues);
-    console.log('commissions_payees:', stats.commissions_payees);
-  }
+  // if (stats) {
+  //   console.log('Stats reçues:', stats);
+  //   console.log('commissions_dues:', stats.commissions_dues);
+  //   console.log('commissions_payees:', stats.commissions_payees);
+  // }
 
   const formatCurrency = (amount: number | string) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;

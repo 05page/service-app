@@ -49,7 +49,7 @@ export const DashboardEmployee = () => {
     try {
       // On récupère le token dans le localStorage
       const token = localStorage.getItem("token");
-      console.log(token)
+      // console.log(token)
       // Si pas de token, on redirige vers la page de connexion
       if (!token) {
         console.error('Pas de token trouvé');
@@ -59,7 +59,7 @@ export const DashboardEmployee = () => {
 
       // Requête API pour récupérer les statistiques de l'utilisateur
       const response = await api.get('/ventes/myStats');
-      console.log(response.data.data)
+      // console.log(response.data.data)
       setMyStats(response.data.data)
     } catch (error: any) {
       // Gestion des erreurs
@@ -82,7 +82,7 @@ export const DashboardEmployee = () => {
     try {
       const response = await api.get('commissions/mesCommissions');
       setMyCommissions(response.data.resume);
-      console.log(response.data.resume);
+      // console.log(response.data.resume);
     } catch (error: any) {
       console.error(error?.response?.data?.message || "Erreur de récupération");
       toast.error(error?.response?.data?.message || "Erreur de récupération");

@@ -124,7 +124,7 @@ export function AchatsSection() {
       const res = await api.get('/fournisseurs')
       if (res.data.success && res.data.data) {
         setFournisseur(res.data.data);
-        console.log(res.data.data)
+        // console.log(res.data.data)
       } else {
         setFournisseur([]);
       }
@@ -174,11 +174,11 @@ export function AchatsSection() {
   const handleFormSubmit = async (formData: FormData) => {
     try {
       // Debug: Log les données envoyées
-      console.log('=== DONNÉES ENVOYÉES AU BACKEND ===');
-      for (let [key, value] of formData.entries()) {
-        console.log(`${key}:`, value);
-      }
-      console.log('=====================================');
+      // console.log('=== DONNÉES ENVOYÉES AU BACKEND ===');
+      // for (let [key, value] of formData.entries()) {
+      //   console.log(`${key}:`, value);
+      // }
+      // console.log('=====================================');
 
       const response = await api.post('/achat/', formData, {
         headers: {
@@ -206,11 +206,11 @@ export function AchatsSection() {
 
     try {
       // Debug: Log les données envoyées
-      console.log('=== DONNÉES MISE À JOUR ENVOYÉES ===');
-      for (let [key, value] of formData.entries()) {
-        console.log(`${key}:`, value);
-      }
-      console.log('=====================================');
+      // console.log('=== DONNÉES MISE À JOUR ENVOYÉES ===');
+      // for (let [key, value] of formData.entries()) {
+      //   console.log(`${key}:`, value);
+      // }
+      // console.log('=====================================');
 
       const response = await api.post(`/achat/${selectAchat.id}?_method=PUT`, formData, {
         headers: {
@@ -487,7 +487,7 @@ export function AchatsSection() {
 
       // envoyer en tant que items[0][...], items[1][...] — Laravel reconstitue bien le tableau
       itemsSubmit.forEach((item, index) => {
-        console.log(`Item ${index}:`, item); // Debug: voir les données des items
+        // console.log(`Item ${index}:`, item); // Debug: voir les données des items
         const itemId = parseInt(String(item.id), 10);
         const quantiteRecu = parseInt(item.quantite_recu, 10);
 
@@ -506,10 +506,10 @@ export function AchatsSection() {
       });
 
       // debug (optionnel)
-      console.log("=== DONNÉES ENVOYÉES (FormData) ===");
-      for (const [key, value] of (formData as any).entries()) {
-        console.log(key, value);
-      }
+      // console.log("=== DONNÉES ENVOYÉES (FormData) ===");
+      // for (const [key, value] of (formData as any).entries()) {
+      //   console.log(key, value);
+      // }
 
       // Vérifier que tous les items ont des données valides
       const invalidItems = itemsSubmit.filter(item =>
@@ -527,12 +527,12 @@ export function AchatsSection() {
       }
 
       // Debug: vérifier les données avant envoi
-      console.log("=== DEBUG AVANT ENVOI ===");
-      console.log("Achat ID:", achatForBonReception.id);
-      console.log("Items à soumettre:", itemsSubmit);
-      console.log("Premier item:", itemsSubmit[0]);
-      console.log("ID du premier item:", itemsSubmit[0]?.id);
-      console.log("Type de l'ID:", typeof itemsSubmit[0]?.id);
+      // console.log("=== DEBUG AVANT ENVOI ===");
+      // console.log("Achat ID:", achatForBonReception.id);
+      // console.log("Items à soumettre:", itemsSubmit);
+      // console.log("Premier item:", itemsSubmit[0]);
+      // console.log("ID du premier item:", itemsSubmit[0]?.id);
+      // console.log("Type de l'ID:", typeof itemsSubmit[0]?.id);
 
       toast.info("Envoi du bon de réception en cours...");
 

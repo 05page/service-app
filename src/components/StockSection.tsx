@@ -70,12 +70,12 @@ export function StockSection() {
       setStock(response.data.data);
 
       const res = await api.get('/achat/achatsDisponibles');
-      console.log('Réponse achats:', res.data.data);
+      // console.log('Réponse achats:', res.data.data);
       if (res.data.success && res.data.data) {
-        console.log("Nombre d'achat trouvés:", res.data.data.length);
+        // console.log("Nombre d'achat trouvés:", res.data.data.length);
         setAchatId(res.data.data)
       } else {
-        console.warn('Aucun achat trouvé');
+        // console.warn('Aucun achat trouvé');
         setAchatId([]);
       }
 
@@ -100,7 +100,7 @@ export function StockSection() {
     try {
       const response = await api.get('/stock/');
       setSelectStock(response.data.data);
-      console.log(response.data.data?.pho)
+      // console.log(response.data.data?.pho)
 
     } catch (error) {
       console.error('Erreur survenue lors de la récupération', error);
@@ -136,10 +136,10 @@ export function StockSection() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('Données du formulaire:', {
-      achat, categorie, quantite,
-      quantiMin, prixVente, description
-    });
+    // console.log('Données du formulaire:', {
+    //   achat, categorie, quantite,
+    //   quantiMin, prixVente, description
+    // });
 
     if (!achat || !categorie || !quantite || !quantiMin || !prixVente) {
       toast.error('Veuillez remplir tous les champs obligatoires')
@@ -157,7 +157,7 @@ export function StockSection() {
         description: description || null
       };
 
-      console.log('Données envoyées à l\'API:', stockData);
+      // console.log('Données envoyées à l\'API:', stockData);
 
       const response = await api.post('/stock', stockData);
 
@@ -250,11 +250,11 @@ export function StockSection() {
   // Fonction pour afficher l'historique d'un stock
   const handleShowHistory = async (stock: any) => {
     try {
-      console.log('=== CHARGEMENT HISTORIQUE ===');
-      console.log('Stock ID:', stock.id);
+      // console.log('=== CHARGEMENT HISTORIQUE ===');
+      // console.log('Stock ID:', stock.id);
       const response = await api.get(`/stock/${stock.id}/historique`);
-      console.log('Réponse complète:', response.data);
-      console.log('Données reçues:', response.data.data);
+      // console.log('Réponse complète:', response.data);
+      // console.log('Données reçues:', response.data.data);
       setStockHistorique(response.data.data);
       setHistoryDialogOpen(true);
     } catch (error: any) {
@@ -280,11 +280,11 @@ export function StockSection() {
   useEffect(() => {
     if (achat) {
       const achatSelectionne = achatId.find(a => a.id === parseInt(achat));
-      console.log('Achat sélectionné:', achatSelectionne);
+      // console.log('Achat sélectionné:', achatSelectionne);
       if (achatSelectionne) {
         setQuantite(String(achatSelectionne.quantite));
         setPrixAchat(String(achatSelectionne.prix_unitaire)); // Récupérer aussi le prix d'achat
-        console.log('Quantité mise à jour:', achatSelectionne.quantite);
+        // console.log('Quantité mise à jour:', achatSelectionne.quantite);
       }
     }
   }, [achat, achatId]);
@@ -609,14 +609,14 @@ export function StockSection() {
                         <div className="relative">
                           {(() => {
                             const imageUrl = getImages(s);
-                            console.log('URL image pour', s.code_produit, ':', imageUrl);
+                            // console.log('URL image pour', s.code_produit, ':', imageUrl);
 
                             return imageUrl ? (
                               <img
                                 src={imageUrl}
                                 alt={s.achat?.nom_service || s.nom_service || 'Produit'}
                                 className="w-12 h-12 object-cover rounded border"
-                                onLoad={() => console.log('Image chargée avec succès:', imageUrl)}
+                                // onLoad={() => console.log('Image chargée avec succès:', imageUrl)}
                               />
                             ) : (
                               <div className="h-12 w-12 bg-muted rounded flex items-center justify-center">
@@ -650,7 +650,7 @@ export function StockSection() {
                         <Badge variant={getStatutColor(s.statut)}>{getStatutLabel(s.statut)}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-1">
+                        <div className="grid grid-cols-2 gap-1">
                           <Button 
                             onClick={() => handleShowHistory(s)} 
                             variant="outline" 
@@ -659,17 +659,6 @@ export function StockSection() {
                           >
                             <History className="h-4 w-4" />
                           </Button>
-                          {(s.statut === 'rupture' || s.statut === 'alerte') && userRole === "admin" && (
-                            <Button 
-                              onClick={() => handleRenewClick(s)} 
-                              variant="outline" 
-                              size="sm"
-                              className="text-green-600 hover:text-green-700"
-                              title='Renouveler le stock'
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
-                          )}
                           <Button 
                             onClick={() => { setDetail(s); setDetailDialogOpen(true) }} 
                             variant="outline" 
@@ -681,6 +670,17 @@ export function StockSection() {
                           {userRole === "admin" && (
                             <Button onClick={() => handleEdit(s)} variant="outline" size="sm" title='Modifier'>
                               <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(s.statut === 'rupture' || s.statut === 'alerte') && userRole === "admin" && (
+                            <Button 
+                              onClick={() => handleRenewClick(s)} 
+                              variant="outline" 
+                              size="sm"
+                              className="text-green-600 hover:text-green-700"
+                              title='Renouveler le stock'
+                            >
+                              <RotateCcw className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
