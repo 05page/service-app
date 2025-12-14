@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import CreatePassword from "./pages/Password";
 import ActivateAccount from "./pages/CodeActivation";
 import ForgotPassword from "./components/ForgotPassword";
+import VerifyEmail from "./pages/emailVerify";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/verify-email/:id/:hash" element={<VerifyEmail />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/password" element={<CreatePassword />} />
